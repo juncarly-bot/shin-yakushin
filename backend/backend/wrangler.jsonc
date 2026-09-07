@@ -3,7 +3,7 @@
   "name": "shin-yakushin-remote-ai",
   "main": "cloudflare-worker.mjs",
   "compatibility_date": "2026-09-01",
-  "secrets": ["OPENAI_API_KEY"],
-  "vars": {"OPENAI_MODEL": "gpt-5-mini"}
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": {"enabled": true, "logs": {"invocation_logs": false}}
 }
-

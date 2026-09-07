@@ -1,4 +1,5 @@
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
+export const DEFAULT_MODEL = 'gpt-5-mini-2025-08-07';
 const EMOTIONS = new Set(['calm','pleased','focused','concerned','relaxed','proud','tired_context']);
 
 export class RemoteAIError extends Error {
@@ -17,7 +18,7 @@ export function sanitizeRequest(raw) {
   if (!userMessage) throw new RemoteAIError('missing_message', 400);
   const context = raw.context && typeof raw.context === 'object' && !Array.isArray(raw.context) ? raw.context : {};
   const safe = {speaker, userMessage, context};
-  if (Buffer.byteLength(JSON.stringify(safe), 'utf8') > 64 * 1024) throw new RemoteAIError('request_too_large', 413);
+  if (new TextEncoder().encode(JSON.stringify(safe)).byteLength > 64 * 1024) throw new RemoteAIError('request_too_large', 413);
   return safe;
 }
 
@@ -53,7 +54,7 @@ function logResponseMetadata(response, data, requestBody) {
   console.info(JSON.stringify({
     event: 'openai_response_metadata',
     http_status: response.status,
-    model: label(data?.model, ['gpt-5-mini', 'gpt-5-mini-2025-08-07', 'gpt-5-nano', 'gpt-5-nano-2025-08-07', 'gpt-4.1-mini', 'gpt-4.1-mini-2025-04-14']),
+    model: label(data?.model, [DEFAULT_MODEL, 'gpt-5-mini', 'gpt-5-nano', 'gpt-5-nano-2025-08-07', 'gpt-4.1-mini', 'gpt-4.1-mini-2025-04-14']),
     reasoning_effort: label(data?.reasoning?.effort, ['none', 'minimal', 'low', 'medium', 'high']),
     content_type: response.headers?.get('content-type')?.includes('application/json') ? 'application/json' : 'other',
     status: label(data?.status, ['completed', 'incomplete', 'failed', 'cancelled', 'queued', 'in_progress']),
@@ -79,9 +80,9 @@ function logResponseMetadata(response, data, requestBody) {
 
 export async function createOpenAIReaction(raw, options = {}) {
   const request = sanitizeRequest(raw);
-  const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
+  const apiKey = options.apiKey ?? globalThis.process?.env?.OPENAI_API_KEY;
   if (!apiKey) throw new RemoteAIError('remote_not_configured');
-  const model = options.model ?? process.env.OPENAI_MODEL ?? 'gpt-5-mini';
+  const model = options.model ?? globalThis.process?.env?.OPENAI_MODEL ?? DEFAULT_MODEL;
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const timeoutMs = options.timeoutMs ?? 12000;
   const controller = new AbortController();
