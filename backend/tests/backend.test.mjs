@@ -7,7 +7,7 @@ const request = {speaker: 'SAYO', userMessage: 'PRIVATE_MESSAGE_SENTINEL', conte
 const reaction = {text: 'PRIVATE_OUTPUT_SENTINEL', emotion: 'pleased', event: 'conversation'};
 const completed = {
   status: 'completed', model: 'gpt-5-mini-2025-08-07', store: false,
-  incomplete_details: null, max_output_tokens: 300,
+  incomplete_details: null, max_output_tokens: 1200,
   text: {format: {type: 'json_schema'}},
   output: [{type: 'reasoning', summary: []}, {type: 'message', status: 'completed', content: [{type: 'output_text', text: JSON.stringify(reaction)}]}],
   usage: {output_tokens: 200, output_tokens_details: {reasoning_tokens: 100}}
@@ -22,6 +22,8 @@ test('SAYO and NurseT preserve structured output, store=false and reaction contr
         assert.equal(url, 'https://api.openai.com/v1/responses');
         const body = JSON.parse(init.body);
         assert.equal(body.store, false);
+        assert.equal(body.max_output_tokens, 1200);
+        assert.deepEqual(body.reasoning, {effort: 'minimal'});
         assert.equal(body.text.format.type, 'json_schema');
         assert.equal(body.text.format.strict, true);
         assert.equal(JSON.parse(body.input[0].content[0].text).speaker, speaker);
@@ -51,6 +53,25 @@ test('diagnostics contain metadata, never key, headers, input, context or output
 test('reasoning-only incomplete response preserves invalid_upstream_output fallback', async () => {
   const incomplete = {...completed, status: 'incomplete', incomplete_details: {reason: 'max_output_tokens'}, output: [{type: 'reasoning', summary: []}], usage: {output_tokens: 300, output_tokens_details: {reasoning_tokens: 300}}};
   await assert.rejects(createOpenAIReaction(request, {apiKey: 'test', fetchImpl: mock(incomplete)}), {code: 'invalid_upstream_output', status: 503});
+});
+
+test('observed 300-token exhaustion with 256 reasoning tokens rejects truncated JSON', async () => {
+  const incomplete = {...completed, status: 'incomplete', max_output_tokens: 300,
+    incomplete_details: {reason: 'max_output_tokens'},
+    output: [{type: 'reasoning', summary: []}, {type: 'message', status: 'incomplete', content: [{type: 'output_text', text: '{"text":"unfinished'}]}],
+    usage: {output_tokens: 300, output_tokens_details: {reasoning_tokens: 256}}
+  };
+  await assert.rejects(createOpenAIReaction(request, {apiKey: 'test', fetchImpl: mock(incomplete)}), {code: 'invalid_upstream_output', status: 503});
+  await assert.rejects(createOpenAIReaction(request, {apiKey: 'test', fetchImpl: mock({...incomplete, output: completed.output})}), {code: 'invalid_upstream_output', status: 503});
+});
+
+test('model override does not receive an unsupported reasoning parameter', async () => {
+  await createOpenAIReaction(request, {apiKey: 'test', model: 'gpt-4.1-mini', fetchImpl: async (url, init) => {
+    const body = JSON.parse(init.body);
+    assert.equal(body.model, 'gpt-4.1-mini');
+    assert.equal(body.reasoning, undefined);
+    return mock(completed)();
+  }});
 });
 
 test('upstream HTTP failures preserve fallback codes and do not log error payloads', async () => {
