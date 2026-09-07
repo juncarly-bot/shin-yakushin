@@ -45,6 +45,38 @@ function validateOutput(raw) {
   return {text, emotion, event: boundedString(value?.event, 48) || 'conversation'};
 }
 
+// Allowlisted metadata only: never log input, output text, headers, or errors.
+function logResponseMetadata(response, data, requestBody) {
+  const label = (value, allowed) => allowed.includes(value) ? value : 'unknown';
+  const count = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
+  const output = Array.isArray(data?.output) ? data.output : [];
+  console.info(JSON.stringify({
+    event: 'openai_response_metadata',
+    http_status: response.status,
+    model: label(data?.model, ['gpt-5-mini', 'gpt-5-mini-2025-08-07', 'gpt-5-nano', 'gpt-5-nano-2025-08-07', 'gpt-4.1-mini', 'gpt-4.1-mini-2025-04-14']),
+    reasoning_effort: label(data?.reasoning?.effort, ['none', 'minimal', 'low', 'medium', 'high']),
+    content_type: response.headers?.get('content-type')?.includes('application/json') ? 'application/json' : 'other',
+    status: label(data?.status, ['completed', 'incomplete', 'failed', 'cancelled', 'queued', 'in_progress']),
+    incomplete_details: data?.incomplete_details == null ? null : {
+      reason: label(data.incomplete_details.reason, ['max_output_tokens', 'content_filter'])
+    },
+    output: output.map(item => ({
+      type: label(item?.type, ['message', 'reasoning', 'function_call']),
+      status: label(item?.status, ['completed', 'incomplete', 'in_progress']),
+      content_types: Array.isArray(item?.content) ? item.content.map(part => label(part?.type, ['output_text', 'refusal'])) : []
+    })),
+    structured_output: requestBody.text.format.type === 'json_schema',
+    strict: requestBody.text.format.strict === true,
+    response_format: label(data?.text?.format?.type, ['json_schema', 'json_object', 'text']),
+    store: requestBody.store,
+    response_store: typeof data?.store === 'boolean' ? data.store : null,
+    max_output_tokens: requestBody.max_output_tokens,
+    response_max_output_tokens: count(data?.max_output_tokens),
+    output_tokens: count(data?.usage?.output_tokens),
+    reasoning_tokens: count(data?.usage?.output_tokens_details?.reasoning_tokens)
+  }));
+}
+
 export async function createOpenAIReaction(raw, options = {}) {
   const request = sanitizeRequest(raw);
   const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
@@ -77,8 +109,13 @@ export async function createOpenAIReaction(raw, options = {}) {
       body: JSON.stringify(body),
       signal: controller.signal
     });
-    if (!response.ok) throw new RemoteAIError(response.status === 429 ? 'upstream_rate_limited' : 'upstream_unavailable');
-    return validateOutput(outputText(await response.json()));
+    if (!response.ok) {
+      logResponseMetadata(response, null, body);
+      throw new RemoteAIError(response.status === 429 ? 'upstream_rate_limited' : 'upstream_unavailable');
+    }
+    const data = await response.json();
+    logResponseMetadata(response, data, body);
+    return validateOutput(outputText(data));
   } catch (error) {
     if (error instanceof RemoteAIError) throw error;
     if (error?.name === 'AbortError') throw new RemoteAIError('upstream_timeout', 504);
