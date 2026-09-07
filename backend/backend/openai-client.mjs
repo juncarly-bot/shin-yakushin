@@ -91,7 +91,9 @@ export async function createOpenAIReaction(raw, options = {}) {
     store: false,
     instructions: instructionsFor(request.speaker),
     input: [{role: 'user', content: [{type: 'input_text', text: JSON.stringify(request)}]}],
-    max_output_tokens: 300,
+    // This budget includes reasoning as well as the final JSON.
+    max_output_tokens: 1200,
+    ...(/^gpt-5-mini(?:-\d{4}-\d{2}-\d{2})?$/.test(model) ? {reasoning: {effort: 'minimal'}} : {}),
     text: {format: {type: 'json_schema', name: 'companion_reaction', strict: true, schema: {
       type: 'object', additionalProperties: false,
       properties: {
@@ -115,6 +117,7 @@ export async function createOpenAIReaction(raw, options = {}) {
     }
     const data = await response.json();
     logResponseMetadata(response, data, body);
+    if (data?.status !== 'completed') throw new RemoteAIError('invalid_upstream_output');
     return validateOutput(outputText(data));
   } catch (error) {
     if (error instanceof RemoteAIError) throw error;
