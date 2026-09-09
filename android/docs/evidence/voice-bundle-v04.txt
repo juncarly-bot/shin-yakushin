@@ -1,0 +1,3 @@
+15.vvm 小夜/SAYO {46: 'ノーマル'} SHA-256 c29b0c0f8e332fcedc2a5de4b4426feb75fc9f587c314da99af8dbc964287221
+11.vvm ナースロボ＿タイプＴ {47: 'ノーマル', 48: '楽々', 49: '恐怖', 50: '内緒話'} SHA-256 3fb0c0f12ec37fda568020509d6e63a0a6b5d6edf3c2330508c6bf4e3eeb8b82
+Bundle metadata and presence checks PASS. Native ABI/SONAME/16KB and license completeness require separate review.

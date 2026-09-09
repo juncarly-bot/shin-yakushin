@@ -1,0 +1,2 @@
+export const voiceDefaults={enabled:false,sayo:true,nurse:true,volume:0.7,frequency:'low',quietHours:true,quietStart:22,quietEnd:7};
+export function voiceSettings(v={}){const x={...voiceDefaults,...v};for(const k of ['enabled','sayo','nurse','quietHours'])if(typeof x[k]!=='boolean')throw Error('音声設定が不正です');if(!Number.isFinite(x.volume)||x.volume<0||x.volume>1||!['low','normal','high'].includes(x.frequency))throw Error('音声設定が不正です');for(const k of ['quietStart','quietEnd'])if(!Number.isInteger(x[k])||x[k]<0||x[k]>23)throw Error('静かな時間の設定が不正です');return x}

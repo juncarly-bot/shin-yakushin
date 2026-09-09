@@ -1,0 +1,41 @@
+✔ old schema2 settings remain valid; invalid voice is rejected (1.792215ms)
+✔ quiet hours crosses midnight and supports all day (0.269726ms)
+✔ speaker selects one speaker and alternates nurse templates (0.733133ms)
+✔ voice off, per-speaker off, stale and quiet suppress audio (0.454854ms)
+✔ previous study skips archived material (2.7795ms)
+✔ assembled AI context is detached from source of truth (0.826092ms)
+✔ remote failure and timeout use local provider (6.462959ms)
+10k-session report ms: 25
+✔ 50 study / 10 break / 40 study / 20 pause equals 90 study and 10 break (3.093021ms)
+✔ background/restart uses wall-clock timestamps (0.208153ms)
+✔ start, finish, resume are idempotent (0.908897ms)
+✔ reclassification never duplicates rewards or study bond (1.106143ms)
+✔ segments split at midnight without losing a second (0.521965ms)
+✔ multi-level plan links infer material and goal (0.450457ms)
+✔ v0.1 migration matches original sessions/reward/bond/review exactly (1.045262ms)
+✔ unknown version, duplicate IDs, invalid intervals, NaN rejected (0.436146ms)
+✔ manual memory is bounded and never silently pruned (9.567007ms)
+✔ automatic memories prune only low-priority events (154.413023ms)
+✔ goal completion and task completion are reflected in daily review (0.443848ms)
+✔ first one-hour session recorded as memory (0.28616ms)
+✔ daily visits do not increase with repeated launch (0.203786ms)
+✔ clock rollback does not create negative study time (0.174453ms)
+✔ long-term material and goal filters retain period progress (4.30884ms)
+✔ reaction templates do not repeat and interactions have cooldown (0.5718ms)
+✔ material halfway reaction is factual and quiet setting is respected (0.167271ms)
+✔ editing an unknown entity cannot create an accidental duplicate (0.15946ms)
+✔ report scales to 10,000 sessions without duplicating time (208.817121ms)
+✔ save failure leaves authoritative state unchanged (2.97222ms)
+✔ restart loads committed active session (0.621394ms)
+✔ stale second UI cannot overwrite a committed session (0.665992ms)
+✔ export/fresh/import restores v0.1 sessions, reward, bond and memory (4.35584ms)
+✔ invalid import and active-session import preserve data (0.532451ms)
+✔ classification keeps source ID and time after persistence (1.441688ms)
+ℹ tests 32
+ℹ suites 0
+ℹ pass 32
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 481.712404

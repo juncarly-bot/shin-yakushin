@@ -1,0 +1,79 @@
+package org.shinyakushin.study.next;
+import android.Manifest;
+import android.app.*;
+import android.content.*;
+import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.net.Uri;
+import android.os.*;
+import android.view.*;
+import android.webkit.*;
+import android.widget.*;
+import org.json.*;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.concurrent.*;
+
+public final class MainActivity extends Activity {
+    private static final String ORIGIN="https://appassets.androidplatform.net";
+    private static final int EXPORT=20,IMPORT=21,NOTIFICATIONS=22;
+    private WebView web;
+    private StateStore store;
+    private VoiceController voice;
+    private RemoteAIClient remoteAI;
+    private final ExecutorService io=Executors.newSingleThreadExecutor();
+    @Override public void onCreate(Bundle saved){
+        super.onCreate(saved);
+        try{store=new StateStore(this);}catch(Exception ex){TextView text=new TextView(this);text.setPadding(32,80,32,32);text.setText("記録を開けませんでした\n\n"+ex.getMessage()+"\n\n元データは保持しています。アプリのデータを消去しないでください。");setContentView(text);return;}
+        voice=new VoiceController(this);remoteAI=new RemoteAIClient(this);web=new WebView(this);web.setBackgroundColor(Color.rgb(245,244,238));setContentView(web);
+        web.setOnApplyWindowInsetsListener((view,insets)->{if(Build.VERSION.SDK_INT>=30){android.graphics.Insets bar=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.ime());view.setPadding(bar.left,bar.top,bar.right,bar.bottom);}else view.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());return insets;});
+        WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(false);settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);settings.setJavaScriptCanOpenWindowsAutomatically(false);settings.setSupportMultipleWindows(false);
+        web.addJavascriptInterface(new Bridge(),"AndroidStore");
+        web.setWebViewClient(new WebViewClient(){
+            @Override public boolean shouldOverrideUrlLoading(WebView w,WebResourceRequest r){return true;}
+            @Override public WebResourceResponse shouldInterceptRequest(WebView w,WebResourceRequest req){
+                Uri u=req.getUrl();String path=u.getPath();Set<String> allowed=new HashSet<>(Arrays.asList("/index.html","/ui.js","/domain.js","/reactions.js","/templates.js","/platform.js","/style.css","/avatar-sheet.png","/timeline.js","/orchestrator.js","/conversation.js","/conversation-shape.js","/characters.js","/companion.js","/voice-settings.js","/remote-ai.js"));
+                if(!"https".equals(u.getScheme())||!"appassets.androidplatform.net".equals(u.getHost())||!allowed.contains(path))return response("text/plain",404,"Not found",new ByteArrayInputStream(new byte[0]));
+                try{return response(path.endsWith(".js")?"text/javascript":path.endsWith(".css")?"text/css":path.endsWith(".png")?"image/png":"text/html",200,"OK",getAssets().open(path.substring(1)));}catch(IOException ex){return response("text/plain",404,"Not found",new ByteArrayInputStream(new byte[0]));}
+            }
+        });
+        web.setWebChromeClient(new WebChromeClient());web.loadUrl(ORIGIN+"/index.html");BreakReceiver.channel(this);BreakReceiver.schedule(this,store.read());
+    }
+    private WebResourceResponse response(String mime,int status,String reason,InputStream in){Map<String,String> h=new HashMap<>();h.put("Content-Security-Policy","default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'");h.put("X-Content-Type-Options","nosniff");return new WebResourceResponse(mime,"UTF-8",status,reason,h,in);}
+    private String result(boolean ok,String raw,String error){try{JSONObject r=new JSONObject();r.put("ok",ok);r.put("raw",raw==null?JSONObject.NULL:raw);r.put("error",error);r.put("warning",store.warning());return r.toString();}catch(JSONException impossible){return "{\"ok\":false,\"error\":\"保存結果を確認できません\"}";}}
+    private final class Bridge {
+        @JavascriptInterface public String licenses(){try(java.io.InputStream in=getAssets().open("licenses.txt")){return new String(VoicevoxProvider.readBytes(in),StandardCharsets.UTF_8);}catch(Exception ex){return "利用条件を読み込めませんでした。";}}
+        @JavascriptInterface public void speak(String raw){voice.speak(raw);}
+        @JavascriptInterface public void speakBatch(String raw){voice.speakBatch(raw);}
+        @JavascriptInterface public void cancelVoice(){voice.cancel();}
+        @JavascriptInterface public String voiceStatus(){return voice.status();}
+        @JavascriptInterface public boolean remoteAIAvailable(){return remoteAI!=null&&remoteAI.available();}
+        @JavascriptInterface public String remoteAIEndpoint(){return remoteAI==null?"":remoteAI.endpoint();}
+        @JavascriptInterface public boolean setRemoteAIEndpoint(String value){return remoteAI!=null&&remoteAI.configure(value);}
+        @JavascriptInterface public void requestRemoteAI(String requestId,String raw){
+            if(remoteAI==null){remoteFailure(requestId);return;}
+            remoteAI.request(requestId,raw,new RemoteAIClient.Callback(){
+                public void success(String id,String response){runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformRemoteAIResult && window.platformRemoteAIResult("+JSONObject.quote(id)+","+JSONObject.quote(response)+")",null);});}
+                public void failure(String id){remoteFailure(id);}
+            });
+        }
+        @JavascriptInterface public String read(){try{return result(true,store.read(),"");}catch(Exception ex){return result(false,null,ex.getMessage());}}
+        @JavascriptInterface public String commit(long revision,String raw,boolean restore){try{store.commit(revision,raw,restore);BreakReceiver.schedule(MainActivity.this,raw);return result(true,store.read(),"");}catch(Exception ex){return result(false,null,ex.getMessage());}}
+        @JavascriptInterface public void exportData(){runOnUiThread(()->{Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/json").addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE,"新躍進政策-"+java.time.LocalDate.now()+".json");startActivityForResult(i,EXPORT);});}
+        @JavascriptInterface public void importData(){runOnUiThread(()->{Intent i=new Intent(Intent.ACTION_GET_CONTENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,IMPORT);});}
+        @JavascriptInterface public void enableNotifications(){runOnUiThread(()->{if(Build.VERSION.SDK_INT>=33&&!BreakReceiver.permitted(MainActivity.this))requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NOTIFICATIONS);else{BreakReceiver.schedule(MainActivity.this,store.read());message("通知の設定を確認しました。休憩は通知なしでも利用できます。");}});}
+        @JavascriptInterface public boolean notificationAllowed(){return BreakReceiver.permitted(MainActivity.this)&&getSystemService(NotificationManager.class).areNotificationsEnabled();}
+    }
+    private void message(String text){runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformMessage && window.platformMessage("+JSONObject.quote(text)+")",null);});}
+    private void remoteFailure(String requestId){runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformRemoteAIError && window.platformRemoteAIError("+JSONObject.quote(requestId)+")",null);});}
+    @Override public void onActivityResult(int request,int resultCode,Intent data){super.onActivityResult(request,resultCode,data);if(resultCode!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();io.execute(()->{try{
+        if(request==EXPORT){String raw=store.read();if(raw==null)throw new IOException("書き出す記録がありません");try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("ファイルを開けません");out.write(raw.getBytes(StandardCharsets.UTF_8));out.flush();}message("バックアップを書き出しました。");}
+        else if(request==IMPORT){String raw;try(InputStream in=getContentResolver().openInputStream(uri);ByteArrayOutputStream out=new ByteArrayOutputStream()){if(in==null)throw new IOException("ファイルを開けません");byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1){if(out.size()+n>25_000_000)throw new IOException("25 MB以下のファイルを選んでください");out.write(buffer,0,n);}raw=out.toString("UTF-8");}store.preserveImport(raw);final String imported=raw;runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformImportCandidate && window.platformImportCandidate("+JSONObject.quote(imported)+")",null);});}
+    }catch(Exception ex){message("ファイル操作を完了できませんでした："+ex.getMessage());}});}
+    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(request==NOTIFICATIONS){BreakReceiver.schedule(this,store.read());message(BreakReceiver.permitted(this)?"休憩終了通知を許可しました。":"通知はオフです。学習・休憩はそのまま使えます。");}}
+    @Override protected void onPause(){if(voice!=null)voice.foreground(false);if(web!=null){web.onPause();web.pauseTimers();}super.onPause();}
+    @Override protected void onResume(){super.onResume();if(voice!=null)voice.foreground(true);if(web!=null){web.resumeTimers();web.onResume();web.evaluateJavascript("window.platformResume && window.platformResume()",null);}}
+    @Override public void onBackPressed(){if(web!=null)web.evaluateJavascript("window.platformBack ? window.platformBack() : false",handled->{if("false".equals(handled))moveTaskToBack(true);});else super.onBackPressed();}
+    @Override protected void onDestroy(){if(voice!=null)voice.close();if(remoteAI!=null)remoteAI.close();if(web!=null){web.removeJavascriptInterface("AndroidStore");web.destroy();web=null;}io.execute(()->{if(store!=null)store.close();});io.shutdown();super.onDestroy();}
+}

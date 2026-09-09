@@ -1,0 +1,10 @@
+BUILD BLOCKED: prerequisites missing:
+- Gradle 8.9 on PATH
+- Android SDK platform 35; set ANDROID_HOME
+- Android build-tools 35.0.0
+- Android CMake 3.22.1
+- Android NDK (compatible with AGP 8.7.3)
+- voicevox/include/voicevox_core.h
+- jniLibs/arm64-v8a/libvoicevox_core.so
+- jniLibs/arm64-v8a/libvoicevox_onnxruntime.so
+- assets/voicevox/manifest.json

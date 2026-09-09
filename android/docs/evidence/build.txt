@@ -1,0 +1,4 @@
+BUILD BLOCKED: prerequisites missing:
+- Gradle 8.9 on PATH
+- Android SDK platform 35; set ANDROID_HOME
+- Android build-tools 35.0.0

@@ -1,0 +1,18 @@
+arm64-v8a/libc++_shared.so 0x4000,
+arm64-v8a/libstudy_voice.so 0x4000,
+arm64-v8a/libvoicevox_core.so 0x4000,
+arm64-v8a/libvoicevox_onnxruntime.so 0x4000,
+x86_64/libc++_shared.so 0x4000,
+x86_64/libstudy_voice.so 0x4000,
+x86_64/libvoicevox_core.so 0x4000,
+x86_64/libvoicevox_onnxruntime.so 0x4000,
+ 0x0000000000000001 (NEEDED)             Shared library: [libvoicevox_core.so]
+ 0x0000000000000001 (NEEDED)             Shared library: [libm.so]
+ 0x0000000000000001 (NEEDED)             Shared library: [libc++_shared.so]
+ 0x0000000000000001 (NEEDED)             Shared library: [libdl.so]
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so]
+ 0x0000000000000001 (NEEDED)             Shared library: [libvoicevox_core.so]
+ 0x0000000000000001 (NEEDED)             Shared library: [libm.so]
+ 0x0000000000000001 (NEEDED)             Shared library: [libc++_shared.so]
+ 0x0000000000000001 (NEEDED)             Shared library: [libdl.so]
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so]

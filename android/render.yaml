@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: shin-yakushin-remote-ai
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: npm test
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeployTrigger: off
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-5-mini
+      - key: REQUESTS_PER_MINUTE
+        value: 12
+

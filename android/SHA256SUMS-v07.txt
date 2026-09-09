@@ -1,0 +1,9 @@
+f8e903232c554f214b83821e959c495165cbc1f2c1585b43b4088cdf2eb1d313  app/src/main/assets/remote-ai.js
+eb47bdaf5b191b6f796def45a1a220819765552db19e785c0557b08fb8c6d6f2  app/src/main/java/org/shinyakushin/study/next/RemoteAIClient.java
+c8d58ddbc58f5dca032840e4d5744ffd0fcc51e82e6ca3974e729bc71287a268  backend/openai-client.mjs
+c53f79a4a7796394d13261134e7e10b9a3737b4c7f685cc20bb1e8e58ee96a43  backend/server.mjs
+c24795a695a8d87093973f8f704e3dec3d9dce7de62a08b079a1b7e2bf0ef632  backend/cloudflare-worker.mjs
+364bf09ee7b53fa16c35b7bd87aa301dca95b1e1ec2bcdd8f5d3b2ac13a4e26b  backend/wrangler.jsonc
+59110cd82c5723464a70ae04d14ccf8823f969722e9864670d2daee302dbe0ef  render.yaml
+388311417e78300bdb90a5b4c09c5126ed710cf9d507016a4c70936d744d4d7d  docs/REMOTE-AI.md
+# APK: NOT GENERATED; see docs/BUILD-v07.md.

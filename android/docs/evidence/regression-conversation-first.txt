@@ -1,0 +1,66 @@
+
+> shin-yakushin-android@0.4.0 test
+> node --test tests/*.test.mjs
+
+✔ old schema2 settings remain valid; invalid voice is rejected (3.565521ms)
+✔ quiet hours crosses midnight and supports all day (0.450904ms)
+✔ speaker selects one speaker and alternates nurse templates (1.412283ms)
+✔ voice off, per-speaker off, stale and quiet suppress audio (1.498229ms)
+✔ previous study skips archived material (7.02716ms)
+✔ assembled AI context is detached from source of truth (1.739484ms)
+✔ remote failure and timeout use local provider (19.612346ms)
+✔ conversation continuation survives restart and uses same domain session flow (30.901577ms)
+✔ same-title choices need explicit entity selection and do not start accidentally (3.279441ms)
+✔ progress finds last studied material without conversation state (2.04174ms)
+✔ memory recall excludes unrelated null references and obeys cooldown (0.935149ms)
+✔ suppressed reaction does not consume a memory recall (1.786791ms)
+✔ emotion persists briefly and conversation history is bounded and validated (4.066455ms)
+✔ future AI context cannot mutate persistent conversation (1.546317ms)
+✔ continuation phrases resolve the remembered material without another question (8.210594ms)
+✔ ambiguous recent continuations ask a short question instead of guessing (3.151732ms)
+✔ memory recall budget, relevance and novelty prevent repeated proof-of-memory (1.175636ms)
+✔ emotion transitions focused to pleased to proud and persists between turns (0.759812ms)
+✔ speaker identity and continuity are shared with detached future AI context (0.709537ms)
+✔ conversation to study, break, resume, finish, progress and review keeps one source session (8.497963ms)
+10k-session report ms: 58
+✔ 50 study / 10 break / 40 study / 20 pause equals 90 study and 10 break (11.111789ms)
+✔ background/restart uses wall-clock timestamps (0.620492ms)
+✔ start, finish, resume are idempotent (1.779653ms)
+✔ reclassification never duplicates rewards or study bond (3.341413ms)
+✔ segments split at midnight without losing a second (3.567421ms)
+✔ multi-level plan links infer material and goal (1.051779ms)
+✔ v0.1 migration matches original sessions/reward/bond/review exactly (1.768327ms)
+✔ unknown version, duplicate IDs, invalid intervals, NaN rejected (4.480182ms)
+✔ manual memory is bounded and never silently pruned (33.602384ms)
+✔ automatic memories prune only low-priority events (593.389171ms)
+✔ goal completion and task completion are reflected in daily review (0.760866ms)
+✔ first one-hour session recorded as memory (0.528553ms)
+✔ daily visits do not increase with repeated launch (0.425298ms)
+✔ clock rollback does not create negative study time (0.241723ms)
+✔ long-term material and goal filters retain period progress (3.170084ms)
+✔ reaction templates do not repeat and interactions have cooldown (1.115902ms)
+✔ material halfway reaction is factual and quiet setting is respected (0.24658ms)
+✔ editing an unknown entity cannot create an accidental duplicate (0.207617ms)
+✔ report scales to 10,000 sessions without duplicating time (583.479564ms)
+✔ save failure leaves authoritative state unchanged (14.392451ms)
+✔ restart loads committed active session (2.455055ms)
+✔ stale second UI cannot overwrite a committed session (6.504739ms)
+✔ export/fresh/import restores v0.1 sessions, reward, bond and memory (11.50135ms)
+✔ invalid import and active-session import preserve data (3.164892ms)
+✔ classification keeps source ID and time after persistence (8.10682ms)
+✔ daily Japanese chat rotates replies and survives restart (14.887261ms)
+✔ conversational study suggestion never silently starts the timer (5.318103ms)
+✔ Study event references the sole session and duplicate finish is harmless (7.669306ms)
+✔ corrupt message import is rejected without changing saved study (1.499862ms)
+✔ timeline budget does not prune Study or Memory (2682.815831ms)
+✔ Home previous study and free study are single-tap actions (1.904954ms)
+✔ finish progress offers bounded quick actions and optional skip (0.676026ms)
+✔ mobile controls retain 48px touch targets and narrow layout fallback (0.443021ms)
+ℹ tests 53
+ℹ suites 0
+ℹ pass 53
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3220.299944

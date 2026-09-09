@@ -1,0 +1,93 @@
+[
+  {
+    "name": "commandlinetools-linux-13114758_latest.zip",
+    "url": "https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip",
+    "size": 164760899,
+    "sha256": "7ec965280a073311c339e571cd5de778b9975026cfcbe79f2b1cdcb1e15317ee",
+    "status": "downloaded"
+  },
+  {
+    "name": "gradle-8.9-bin.zip",
+    "url": "https://services.gradle.org/distributions/gradle-8.9-bin.zip",
+    "size": 136114148,
+    "sha256": "d725d707bfabd4dfdc958c624003b3c80accc03f7037b5122c4b1d0ef15cecab",
+    "status": "downloaded"
+  },
+  {
+    "name": "jdk17.tar.gz",
+    "url": "https://api.adoptium.net/v3/binary/latest/17/ga/linux/x64/jdk/hotspot/normal/eclipse",
+    "size": 193252603,
+    "sha256": "3808d1d15e3ec6bd5b84057fb5d84c33d8a1536a258146bcea2e603fc726e08e",
+    "status": "downloaded"
+  },
+  {
+    "name": "voicevox_core-android-arm64-0.17.0.zip",
+    "url": "https://github.com/VOICEVOX/voicevox_core/releases/download/0.17.0/voicevox_core-android-arm64-0.17.0.zip",
+    "size": 1295336,
+    "sha256": "a2a7191bc2d9182d2d5c9cfa37fdf07f51d46219974da91786ff676bc1b0a54a",
+    "status": "downloaded"
+  },
+  {
+    "name": "voicevox_core-android-x86_64-0.17.0.zip",
+    "url": "https://github.com/VOICEVOX/voicevox_core/releases/download/0.17.0/voicevox_core-android-x86_64-0.17.0.zip",
+    "size": 1353740,
+    "sha256": "c438436ac1d9f7767b40d83718e37d900688f77da3b370db39bc6fb573c57a61",
+    "status": "downloaded"
+  },
+  {
+    "name": "voicevox_onnxruntime-android-arm64-1.23.2.tgz",
+    "url": "https://github.com/VOICEVOX/onnxruntime-builder/releases/download/voicevox_onnxruntime-1.23.2/voicevox_onnxruntime-android-arm64-1.23.2.tgz",
+    "size": 6459115,
+    "sha256": "43e6fc2a89ea6412d4cc20215042a3b34da22fdf05c1bb76256a686f82378d46",
+    "status": "downloaded"
+  },
+  {
+    "name": "voicevox_onnxruntime-android-x64-1.23.2.tgz",
+    "url": "https://github.com/VOICEVOX/onnxruntime-builder/releases/download/voicevox_onnxruntime-1.23.2/voicevox_onnxruntime-android-x64-1.23.2.tgz",
+    "size": 7115144,
+    "sha256": "807e2ea50dfb2a309416adb1cee6edc53d3d8eae1d702ad4e6f199a0f91f2d24",
+    "status": "downloaded"
+  },
+  {
+    "name": "11.vvm",
+    "url": "https://github.com/VOICEVOX/voicevox_vvm/releases/download/0.17.0/11.vvm",
+    "size": 61687324,
+    "sha256": "3fb0c0f12ec37fda568020509d6e63a0a6b5d6edf3c2330508c6bf4e3eeb8b82",
+    "status": "downloaded"
+  },
+  {
+    "name": "15.vvm",
+    "url": "https://github.com/VOICEVOX/voicevox_vvm/releases/download/0.17.0/15.vvm",
+    "size": 67265793,
+    "sha256": "c29b0c0f8e332fcedc2a5de4b4426feb75fc9f587c314da99af8dbc964287221",
+    "status": "downloaded"
+  },
+  {
+    "name": "VVM-TERMS.txt",
+    "url": "https://github.com/VOICEVOX/voicevox_vvm/releases/download/0.17.0/TERMS.txt",
+    "size": 15667,
+    "sha256": "57fc18afeebc8a08c303b2b4e3f05bf6453a37c482d17c04ec3fbc674e5fc5f4",
+    "status": "downloaded"
+  },
+  {
+    "name": "vvm-release.json",
+    "url": "https://api.github.com/repos/VOICEVOX/voicevox_vvm/releases/tags/0.17.0",
+    "size": 58508,
+    "sha256": "14f2c3b5fdf1303ea9356ca445726d87d9839a1fbc142238dd2dd25f6e6c20a3",
+    "status": "downloaded"
+  },
+  {
+    "name": "core-release.json",
+    "url": "https://api.github.com/repos/VOICEVOX/voicevox_core/releases/tags/0.17.0",
+    "size": 50758,
+    "sha256": "8714196665711c6fa845cf4a8b29e3f7ba623f8d5d6c5c31a8e638142ca0a31c",
+    "status": "downloaded"
+  },
+  {
+    "name": "ort-release.json",
+    "url": "https://api.github.com/repos/VOICEVOX/onnxruntime-builder/releases/tags/voicevox_onnxruntime-1.23.2",
+    "size": 41748,
+    "sha256": "26e2ace3febceb07e86517f58e07e95b275456bb7f326aa47e9eb0cb0c60afa6",
+    "status": "downloaded"
+  }
+]

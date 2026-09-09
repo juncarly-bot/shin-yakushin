@@ -1,0 +1,1 @@
+{"name":"shin-yakushin-android","version":"0.7.0","private":true,"type":"module","scripts":{"test":"node --test tests/*.test.mjs","check":"node --check app/src/main/assets/ui.js && node --check app/src/main/assets/remote-ai.js && node --check backend/server.mjs && node --check backend/openai-client.mjs"}}

@@ -1,0 +1,28 @@
+{
+  "core": "0.17.0",
+  "onnxruntime": "1.23.2",
+  "files": {
+    "11.vvm": "3fb0c0f12ec37fda568020509d6e63a0a6b5d6edf3c2330508c6bf4e3eeb8b82",
+    "15.vvm": "c29b0c0f8e332fcedc2a5de4b4426feb75fc9f587c314da99af8dbc964287221",
+    "dict/COPYING": "f4eca42ebd930e2c6e57fca58319d989bebcd1510cb7714b149c50f5425135ea",
+    "dict/char.bin": "888ee94c5a8a7a26d24ab3f1b7155441351954fd51ea06b4a2f78bd742492b2f",
+    "dict/left-id.def": "db1adac8a7f9e5854cd82ea044c85115249206c8181b9d88cf92ae2ee5e87b84",
+    "dict/matrix.bin": "62fd16b4f64c851d5dc352ef0d5740c5fc83ddc7c203b2b0b1fc5271969a14ce",
+    "dict/pos-id.def": "3460aa742053085af47cdfc889a1e0e6f557e89b406e501ba81c9ccc286de0c7",
+    "dict/rewrite.def": "7f7c8dfbfe24092e8a149a9b6e0a3a7f1c2cf37d6c3dc29d1cccc6c004da9c1c",
+    "dict/right-id.def": "db1adac8a7f9e5854cd82ea044c85115249206c8181b9d88cf92ae2ee5e87b84",
+    "dict/sys.dic": "ca57d9029691a70a5dfb99afc2844180256161d7130da65b1a867510e129b9a6",
+    "dict/unk.dic": "ce97851ecda075914fa3ffe7294a1ab34ee4f6d56ba6bf9197d74143b5dffbfe",
+    "licenses/core/LICENSE": "f3d1c14bdea7fc3121303662a2e3ce32a7bc1ef3bbd63375a416044df9b2dc59",
+    "licenses/core/README.txt": "8b8516df883dc382bf14725929c9683faa30310d1867cd7f48c3f3561f8d7256",
+    "licenses/core/VERSION": "02d38e98e88f4a8dc2ea40dbb769338601066fc94920b52882a14f21ad97f7ee",
+    "licenses/nurse-t/rules.html": "5fd1bf29481c08023977e8d8e34e95bdce6d97ae01395c076cc432dcb8f81b7b",
+    "licenses/onnxruntime/GIT_COMMIT_ID": "5070fa9b5ae2eca2687db1269266c6eb653f669d0e29aaf598c3a8fc84d3deb8",
+    "licenses/onnxruntime/TERMS.txt": "9ee435c032bdbbde8b38e3bc37204db8c0ac60d1ad082da62eb66b7c72fd7823",
+    "licenses/onnxruntime/VERSION_NUMBER": "48d625eaf5c6c9ce0c6890c697201fd6087c6147773feb8ca9a85e4f8004e79f",
+    "licenses/onnxruntime/third-party-notices.html": "c2bbe645b30fb84014b3178b8d56264a44c0c8a22231b83fc7d3365b25e88b7a",
+    "licenses/open-jtalk/COPYING": "f4eca42ebd930e2c6e57fca58319d989bebcd1510cb7714b149c50f5425135ea",
+    "licenses/sayo/guideline.html": "d3e2ec2ece5ad825442f92ee6c5716bfcb1bd88ec3cad1170a90e72d3c8daacd",
+    "licenses/vvm/VVM-TERMS.txt": "57fc18afeebc8a08c303b2b4e3f05bf6453a37c482d17c04ec3fbc674e5fc5f4"
+  }
+}

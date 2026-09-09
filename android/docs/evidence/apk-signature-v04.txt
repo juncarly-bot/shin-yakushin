@@ -1,0 +1,3 @@
+APK v2 signature/content digest/ZIP/JNI verification PASS
+APK SHA-256 bc3c95ff6550587673338d89a555e955650905a2cc7711a7dee4bfaf002eb380
+Certificate SHA-256 2f79703b5bdb69022add6b3bc017f73bc268f9a608df6524a0669f92fc6e837a

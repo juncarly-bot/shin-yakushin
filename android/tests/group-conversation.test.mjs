@@ -1,0 +1,12 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {StudyApplication} from '../app/src/main/assets/platform.js';
+import {ConversationPlan,conversationPlan} from '../app/src/main/assets/orchestrator.js';
+import {metrics} from '../app/src/main/assets/domain.js';
+class Host{raw=null;read(){return JSON.stringify({ok:true,raw:this.raw})}commit(rev,raw){this.raw=raw;return this.read()}}
+function setup(){let time=1900000000000;const app=new StudyApplication(new Host(),()=>time);app.load();return {app,advance:ms=>time+=ms,now:()=>time}}
+
+test('ordinary conversation stays SAYO-first without forced group chatter',()=>{const {app}=setup();app.command('chat',{text:'ただいま'});assert.deepEqual(app.lastVoiceMessages.map(x=>x.speaker),['SAYO']);assert.equal(app.state.messages.at(-1).speaker,'SAYO')});
+test('care context may invite T once with a distinct response',()=>{const {app}=setup();app.command('chat',{text:'今日はへとへとでしんどい'});const group=app.lastVoiceMessages;assert.deepEqual(group.map(x=>x.speaker),['SAYO','NurseT']);assert.notEqual(group[0].text,group[1].text);assert.equal(app.state.conversation.lastSpeaker,'NurseT')});
+test('two-hour finish creates bounded SAYO T SAYO exchange around one Study event',()=>{const {app,advance,now}=setup();app.command('start',{sessionId:'long-one',title:'グリフィス電磁気学'});advance(3*3600*1000);app.command('finish',{sessionId:'long-one'});assert.equal(conversationPlan(app.state,'finish',null,now()),ConversationPlan.SHORT_GROUP_EXCHANGE);assert.deepEqual(app.lastVoiceMessages.map(x=>x.speaker),['SAYO','NurseT','SAYO']);assert.equal(app.state.messages.filter(x=>x.sessionId==='long-one').length,1);assert.equal(app.state.sessions.filter(x=>x.sessionId==='long-one').length,1);assert.equal(metrics(app.state,now()).reward,180)});
+test('break remains T-led and never duplicates the active StudySession',()=>{const {app,advance}=setup();app.command('start',{sessionId:'study',title:'自由学習'});advance(1000);app.command('break',{sessionId:'study',minutes:5});assert.deepEqual(app.lastVoiceMessages.map(x=>x.speaker),['NurseT']);assert.equal(app.state.sessions.length,1)});
+test('voice batches contain character messages only and stay within native queue bound',()=>{const {app,advance}=setup();app.command('start',{sessionId:'one',title:'本'});advance(3*3600*1000);app.command('finish',{sessionId:'one'});assert.ok(app.lastVoiceMessages.length<=4);assert.ok(app.lastVoiceMessages.every(x=>['SAYO','NurseT'].includes(x.speaker)&&x.text.length>0))});

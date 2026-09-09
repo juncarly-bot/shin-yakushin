@@ -1,0 +1,6 @@
+bc3c95ff6550587673338d89a555e955650905a2cc7711a7dee4bfaf002eb380  dist/shin-yakushin-v0.4-conversation-debug.apk
+453926fa8f7e33be912683fd258cff78b873b5f17c3f0a02373ee7d0eba911d9  /workspace/scratch/e0ec62e0721d/work-v04-recovered/shin-yakushin-v0.4-conversation-source.zip
+83cb6482b6e22ba5d1b0495aed730f1510cec2f5d6f01fb06fc12fe4dc14c71c  docs/evidence/SAYO-linux.wav
+dac7f03e593f6825186ed71ae99053a65c4afa47fbf5adb278b7481828866bd7  docs/evidence/NurseT-linux.wav
+3fb0c0f12ec37fda568020509d6e63a0a6b5d6edf3c2330508c6bf4e3eeb8b82  app/src/main/assets/voicevox/11.vvm
+c29b0c0f8e332fcedc2a5de4b4426feb75fc9f587c314da99af8dbc964287221  app/src/main/assets/voicevox/15.vvm

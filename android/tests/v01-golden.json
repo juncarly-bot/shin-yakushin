@@ -1,0 +1,242 @@
+{
+  "state": {
+    "schemaVersion": 1,
+    "revision": 0,
+    "sessions": [
+      {
+        "sessionId": "v01-session",
+        "startTimestamp": 1788582000000,
+        "endTimestamp": 1788588000000,
+        "sourceType": "plan",
+        "note": "synthetic",
+        "title": "自由学習",
+        "segments": [
+          {
+            "kind": "study",
+            "start": 1788582000000,
+            "end": 1788585000000
+          },
+          {
+            "kind": "break",
+            "start": 1788585000000,
+            "end": 1788585600000
+          },
+          {
+            "kind": "study",
+            "start": 1788585600000,
+            "end": 1788588000000
+          }
+        ],
+        "breakUntil": null,
+        "milestones": [],
+        "relatedMaterialId": "a1fd1c29-1b07-4da6-8d00-0558e2bd1c63",
+        "relatedGoalId": "9ce8425a-295c-4aa7-bd65-0049edbd0442",
+        "relatedTaskId": "29801fc5-fb97-41cc-a79e-23aa6f0336b4",
+        "relatedPlanId": "68b53ee7-d830-4cbc-82da-d967fea7efe1"
+      }
+    ],
+    "materials": [
+      {
+        "id": "a1fd1c29-1b07-4da6-8d00-0558e2bd1c63",
+        "createdAt": 1788582000000,
+        "completedAt": null,
+        "progress": 145,
+        "title": "QA book",
+        "memo": "",
+        "archived": false,
+        "target": 500,
+        "unit": "pages"
+      }
+    ],
+    "goals": [
+      {
+        "id": "9ce8425a-295c-4aa7-bd65-0049edbd0442",
+        "createdAt": 1788582000000,
+        "completedAt": null,
+        "progress": 20,
+        "title": "QA goal",
+        "memo": "",
+        "archived": false,
+        "target": 100,
+        "unit": "%"
+      }
+    ],
+    "tasks": [
+      {
+        "id": "29801fc5-fb97-41cc-a79e-23aa6f0336b4",
+        "createdAt": 1788582000000,
+        "completedAt": 1788588000000,
+        "progress": 0,
+        "title": "QA task",
+        "memo": "",
+        "archived": false,
+        "relatedMaterialId": "a1fd1c29-1b07-4da6-8d00-0558e2bd1c63",
+        "relatedGoalId": "9ce8425a-295c-4aa7-bd65-0049edbd0442",
+        "relatedTaskId": null,
+        "relatedPlanId": null,
+        "done": true
+      }
+    ],
+    "plans": [
+      {
+        "id": "68b53ee7-d830-4cbc-82da-d967fea7efe1",
+        "createdAt": 1788582000000,
+        "completedAt": null,
+        "progress": 0,
+        "title": "QA plan",
+        "memo": "",
+        "archived": false,
+        "relatedMaterialId": "a1fd1c29-1b07-4da6-8d00-0558e2bd1c63",
+        "relatedGoalId": "9ce8425a-295c-4aa7-bd65-0049edbd0442",
+        "relatedTaskId": "29801fc5-fb97-41cc-a79e-23aa6f0336b4",
+        "relatedPlanId": null,
+        "done": false,
+        "date": "2026-09-05"
+      }
+    ],
+    "memories": [
+      {
+        "id": "63fa2f38-62ed-431b-a41a-78e167200be4",
+        "category": "manual",
+        "text": "Synthetic memory",
+        "timestamp": 1788582000000,
+        "relatedId": null,
+        "importance": 5
+      },
+      {
+        "id": "progress:00041645-bfcd-4461-a442-c9689de0d1ff",
+        "category": "progress",
+        "text": "QA goal：20 %へ。",
+        "timestamp": 1788582000000,
+        "relatedId": "00041645-bfcd-4461-a442-c9689de0d1ff",
+        "importance": 1
+      },
+      {
+        "id": "progress:30270996-1dde-4837-a81f-0a1232d0d6b6",
+        "category": "progress",
+        "text": "QA book：145 pagesへ。",
+        "timestamp": 1788582000000,
+        "relatedId": "30270996-1dde-4837-a81f-0a1232d0d6b6",
+        "importance": 1
+      },
+      {
+        "id": "first:v01-session",
+        "category": "first",
+        "text": "はじめて一緒に勉強した日。",
+        "timestamp": 1788588000000,
+        "relatedId": "v01-session",
+        "importance": 3
+      },
+      {
+        "id": "long:v01-session",
+        "category": "long",
+        "text": "90分、一緒に勉強した。",
+        "timestamp": 1788588000000,
+        "relatedId": "v01-session",
+        "importance": 2
+      },
+      {
+        "id": "task:29801fc5-fb97-41cc-a79e-23aa6f0336b4",
+        "category": "task",
+        "text": "QA taskを終えた。",
+        "timestamp": 1788588000000,
+        "relatedId": "29801fc5-fb97-41cc-a79e-23aa6f0336b4",
+        "importance": 2
+      }
+    ],
+    "visits": [
+      "2026-09-05"
+    ],
+    "progressEvents": [
+      {
+        "id": "a46225fd-cd16-4a53-a7a7-2587ce6a9d3c",
+        "kind": "goals",
+        "relatedId": "9ce8425a-295c-4aa7-bd65-0049edbd0442",
+        "title": "QA goal",
+        "before": 0,
+        "after": 20,
+        "timestamp": 1788582000000
+      },
+      {
+        "id": "834807e1-f33b-4701-8172-01f2c6706a23",
+        "kind": "materials",
+        "relatedId": "a1fd1c29-1b07-4da6-8d00-0558e2bd1c63",
+        "title": "QA book",
+        "before": 0,
+        "after": 145,
+        "timestamp": 1788582000000
+      }
+    ],
+    "dialogueHistory": {},
+    "reaction": null,
+    "settings": {
+      "name": "",
+      "utcOffsetMinutes": 540,
+      "breakMinutes": 5,
+      "quiet": false
+    },
+    "lastSeen": 1788582000000
+  },
+  "now": 1788588000000,
+  "metrics": {
+    "streak": 1,
+    "studyBond": 1.5,
+    "familiarity": 1,
+    "sharedMemories": 6,
+    "reward": 90,
+    "studyDays": 1,
+    "seconds": 5400.0
+  },
+  "report": {
+    "daily": {
+      "2026-09-05": 5400.0,
+      "2026-09-06": 0.0
+    },
+    "seconds": 5400.0,
+    "sessions": [
+      "v01-session"
+    ],
+    "materials": {
+      "a1fd1c29-1b07-4da6-8d00-0558e2bd1c63": 5400.0
+    },
+    "completedTasks": [
+      {
+        "id": "29801fc5-fb97-41cc-a79e-23aa6f0336b4",
+        "createdAt": 1788582000000,
+        "completedAt": 1788588000000,
+        "progress": 0,
+        "title": "QA task",
+        "memo": "",
+        "archived": false,
+        "relatedMaterialId": "a1fd1c29-1b07-4da6-8d00-0558e2bd1c63",
+        "relatedGoalId": "9ce8425a-295c-4aa7-bd65-0049edbd0442",
+        "relatedTaskId": null,
+        "relatedPlanId": null,
+        "done": true
+      }
+    ],
+    "goalProgress": [
+      {
+        "id": "a46225fd-cd16-4a53-a7a7-2587ce6a9d3c",
+        "kind": "goals",
+        "relatedId": "9ce8425a-295c-4aa7-bd65-0049edbd0442",
+        "title": "QA goal",
+        "before": 0,
+        "after": 20,
+        "timestamp": 1788582000000
+      }
+    ],
+    "materialProgress": [
+      {
+        "id": "834807e1-f33b-4701-8172-01f2c6706a23",
+        "kind": "materials",
+        "relatedId": "a1fd1c29-1b07-4da6-8d00-0558e2bd1c63",
+        "title": "QA book",
+        "before": 0,
+        "after": 145,
+        "timestamp": 1788582000000
+      }
+    ],
+    "studyDays": 1
+  }
+}
