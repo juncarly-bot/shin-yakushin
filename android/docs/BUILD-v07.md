@@ -1,6 +1,6 @@
 # Build report — v0.7 Remote AI
 
-Date: 2026-09-07
+Date: 2026-09-09
 
 - Application ID: `org.shinyakushin.study.next.v07.preview`
 - Version: 7 / `0.7.0-preview`
@@ -17,8 +17,11 @@ Date: 2026-09-07
 - Android CMake 3.22.1
 - Android NDK compatible with AGP 8.7.3
 
+The recovered VOICEVOX bundle is present locally and passes metadata and SHA-256 verification (`tools/verify_voice_bundle.py` and `SHA256SUMS-VOICEVOX-v07.txt`). Large third-party binaries are deliberately excluded from GitHub source blobs; `docs/VOICE-BUNDLE-v07.md` and `tools/restore_voice_bundle.sh` describe the durable restore path.
+
 Java source parsing passed, but this is not Android symbol/type compilation. No old APK was renamed or reported as a v0.7 build.
 
 Backend uses Node.js 20+ and has no runtime package dependency. `node --test tests/*.test.mjs` covers the mocked OpenAI Responses request and HTTP boundary without requiring an API key.
 
 The lightweight source archive excludes the already verified third-party VVM, Open JTalk dictionary, native VOICEVOX libraries, and WAV evidence to avoid redistributing a 275 MB binary bundle as source. Their official licenses, manifests and verification records remain documented in the workspace. The full working tree retains those files.
+

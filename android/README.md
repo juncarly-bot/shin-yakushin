@@ -4,7 +4,7 @@ The v0.7 source retains the shared SAYO/NurseT conversation, Study source-of-tru
 
 毎日の学習をすぐ始め、何をどこまで進めたかを残し、後から積み重ねを振り返るためのアプリです。小夜はローカルの履歴とテンプレートを使って短く反応します。
 
-**現在は NOT READY。公式VOICEVOX資材はソースへ同梱済みですが、v0.7 APKは未生成です。現在の環境にAndroid SDK、Gradle、adb、EmulatorがないためAndroid実行、再生、画面は未検証です。** 本番データをこの版だけに移さないでください。既存アプリやデータは変更していません。
+**現在は NOT READY。VOICEVOX資材はローカル作業木でchecksum検証済みですが、v0.7 APKは未生成です。現在の環境にAndroid SDK、Gradle、adb、EmulatorがないためAndroid実行、再生、画面は未検証です。** 本番データをこの版だけに移さないでください。既存アプリやデータは変更していません。
 
 ## 日常の流れ
 
@@ -57,3 +57,4 @@ SQLiteトランザクション、revisionによる競合検出、AtomicFileに�
 ## v0.3追加
 
 Homeの前回の続き、終了後の短い進捗入力、音声設定と話者選択、JNI音声合成と再生・cache・queueを追加。音声初期値はOFF。詳細はdocs/VOICEVOX.md、配布前の条件はLICENSES.mdを参照。モデルを同梱するため、ビルド前に公式依存物の配置・検証が必要です。
+
