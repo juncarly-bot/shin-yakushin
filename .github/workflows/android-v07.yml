@@ -68,15 +68,15 @@ jobs:
           accept_download ./download --only models --models-version "$VOICEVOX_VERSION" --models-pattern '{11,15}.vvm'
           cd "$GITHUB_WORKSPACE/android"
           mkdir -p app/src/main/voicevox/include app/src/main/assets/voicevox/dict
-          find "$work" -type f -name voicevox_core.h -exec cp {} app/src/main/voicevox/include/voicevox_core.h \\;
+          find "$work" -type f -name voicevox_core.h -exec cp {} app/src/main/voicevox/include/voicevox_core.h \;
           for abi in arm64-v8a x86_64; do
             mkdir -p "app/src/main/jniLibs/$abi"
-            find "$work" -type f -path "*/$abi/libvoicevox_core.so" -exec cp {} "app/src/main/jniLibs/$abi/libvoicevox_core.so" \\;
-            find "$work" -type f -path "*/$abi/libvoicevox_onnxruntime.so" -exec cp {} "app/src/main/jniLibs/$abi/libvoicevox_onnxruntime.so" \\;
+            find "$work" -type f -path "*/$abi/libvoicevox_core.so" -exec cp {} "app/src/main/jniLibs/$abi/libvoicevox_core.so" \;
+            find "$work" -type f -path "*/$abi/libvoicevox_onnxruntime.so" -exec cp {} "app/src/main/jniLibs/$abi/libvoicevox_onnxruntime.so" \;
           done
-          find "$work" -type f -name '11.vvm' -exec cp {} app/src/main/assets/voicevox/11.vvm \\;
-          find "$work" -type f -name '15.vvm' -exec cp {} app/src/main/assets/voicevox/15.vvm \\;
-          dict_dir="$(find "$work" -type f -name sys.dic -printf '%h\\n' | head -1)"
+          find "$work" -type f -name '11.vvm' -exec cp {} app/src/main/assets/voicevox/11.vvm \;
+          find "$work" -type f -name '15.vvm' -exec cp {} app/src/main/assets/voicevox/15.vvm \;
+          dict_dir="$(find "$work" -type f -name sys.dic -printf '%h\n' | head -1)"
           test -n "$dict_dir"
           cp "$dict_dir"/* app/src/main/assets/voicevox/dict/
           python3 tools/verify_voice_bundle.py
@@ -102,7 +102,7 @@ jobs:
           test -s "$apk"
           sha256sum "$apk" | tee APK-SHA256SUMS.txt
           unzip -p "$apk" AndroidManifest.xml >/dev/null
-          if unzip -p "$apk" | strings | grep -E 'OPENAI_API_KEY|api\\.openai\\.com|sk-[A-Za-z0-9_-]{20,}|Authorization: Bearer'; then
+          if unzip -p "$apk" | strings | grep -E 'OPENAI_API_KEY|api\.openai\.com|sk-[A-Za-z0-9_-]{20,}|Authorization: Bearer'; then
             echo 'secret-like content found in APK' >&2
             exit 1
           fi
