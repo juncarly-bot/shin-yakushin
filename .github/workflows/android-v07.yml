@@ -54,7 +54,6 @@ jobs:
             "https://github.com/VOICEVOX/voicevox_core/releases/download/${VOICEVOX_VERSION}/download-linux-x64" \
             --output "$work/download"
           chmod +x "$work/download"
-          cd "$work"
           accept_download() {
             set +o pipefail
             yes | "$@"
@@ -62,11 +61,21 @@ jobs:
             set -o pipefail
             test "$status" -eq 0
           }
-          accept_download ./download --os android --only c-api --c-api-version "$VOICEVOX_VERSION"
-          accept_download ./download --os android --only onnxruntime --onnxruntime-version "$ONNX_VERSION"
-          accept_download ./download --only dict
-          accept_download ./download --only models --models-version "$VOICEVOX_VERSION" --models-pattern '11.vvm'
-          accept_download ./download --only models --models-version "$VOICEVOX_VERSION" --models-pattern '15.vvm'
+          for arch in arm64 x64; do
+            mkdir -p "$work/$arch"
+            (
+              cd "$work/$arch"
+              accept_download "$work/download" --os android --cpu-arch "$arch" --only c-api --c-api-version "$VOICEVOX_VERSION"
+              accept_download "$work/download" --os android --cpu-arch "$arch" --only onnxruntime --onnxruntime-version "$ONNX_VERSION"
+            )
+          done
+          mkdir -p "$work/common"
+          (
+            cd "$work/common"
+            accept_download "$work/download" --only dict
+            accept_download "$work/download" --only models --models-version "$VOICEVOX_VERSION" --models-pattern '11.vvm'
+            accept_download "$work/download" --only models --models-version "$VOICEVOX_VERSION" --models-pattern '15.vvm'
+          )
           cd "$GITHUB_WORKSPACE/android"
           mkdir -p app/src/main/voicevox/include app/src/main/assets/voicevox/dict
           find "$work" -type f -name voicevox_core.h -exec cp {} app/src/main/voicevox/include/voicevox_core.h \;
