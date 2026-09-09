@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Public backend endpoint only. Override in a deployment resource overlay; never place a provider secret in the app. -->
-    <string name="remote_ai_backend_url" translatable="false"></string>
+    <string name="remote_ai_backend_url" translatable="false">https://shin-yakushin.onrender.com/v1/reactions</string>
 </resources>
