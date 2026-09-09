@@ -1,0 +1,6 @@
+3fb0c0f12ec37fda568020509d6e63a0a6b5d6edf3c2330508c6bf4e3eeb8b82  app/src/main/assets/voicevox/11.vvm
+c29b0c0f8e332fcedc2a5de4b4426feb75fc9f587c314da99af8dbc964287221  app/src/main/assets/voicevox/15.vvm
+8ccdc5608550fdc5b01ed3414462e1cb74b68eff907267626b5eb856e6ffb649  app/src/main/jniLibs/arm64-v8a/libvoicevox_core.so
+b5380b9d310bbd1f46b20b1406d6a5a030ff5f36a45964481af8af5a54c4e4a5  app/src/main/jniLibs/arm64-v8a/libvoicevox_onnxruntime.so
+9ca4f7a4a391a9af603a621b767fdc8bc9b9d96c5a5da920a43ceab894d2a929  app/src/main/jniLibs/x86_64/libvoicevox_core.so
+398db8c38855e27b93cb9735597a83946ca38345c68ecc71db58b2b11f41bf1e  app/src/main/jniLibs/x86_64/libvoicevox_onnxruntime.so
