@@ -15,7 +15,23 @@ const timeOf=t=>new Date(t+S.settings.utcOffsetMinutes*60000).toISOString().slic
 function toast(s){const el=document.querySelector('#toast');el.textContent=s;el.style.display='block';clearTimeout(toast.timeout);toast.timeout=setTimeout(()=>el.style.display='none',6500)}
 function speakMessages(messages,previous){try{const request=speechRequest(S,previous,now(),lastSpoken);if(!request)return;const v=voiceSettings(S.settings.voice),batch=(messages??[]).filter(m=>m.speaker==='SAYO'?v.sayo:m.speaker==='NurseT'&&v.nurse).map(m=>({speaker:m.speaker,text:m.text,volume:v.volume,priority:request.priority}));if(batch.length&&host.speakBatch)host.speakBatch(JSON.stringify(batch));else if(host.speak)host.speak(JSON.stringify(request));lastSpoken=now()}catch{}}
 function command(a,p={},deferVoice=false){try{const previous=S?.reaction;if(a==='chat'){host.cancelVoice?.();remoteAI?.cancel()}S=app.command(a,p);if(a==='settings')host.cancelVoice?.();if(!deferVoice)speakMessages(app.lastVoiceMessages,previous);if(app.warning)toast(app.warning);return true}catch(e){S=app.state;toast(e.message);return false}}
-async function enhanceConversation(localMessages,userMessage,previous){const target=(localMessages??[]).find(m=>['SAYO','NurseT'].includes(m.speaker));if(!target){speakMessages(localMessages,previous);return}try{const context=new ContextAssembler().assemble(S,now()),result=await remoteAI.generate(remoteRequest(S,userMessage,target.speaker,context));S=app.acceptRemoteReaction(target.id,result);const updated=S.messages.find(m=>m.id===target.id),batch=localMessages.map(m=>m.id===target.id?updated:m);render();speakMessages(batch,previous)}catch{const index=S.messages.findIndex(m=>m.id===target.id),lastUser=S.messages.map(m=>m.speaker).lastIndexOf('user');if(index>lastUser)speakMessages(localMessages,previous)}}
+let remoteTurn=0;
+async function enhanceConversation(localMessages,userMessage,previous){
+ const target=(localMessages??[]).find(m=>['SAYO','NurseT'].includes(m.speaker));
+ if(!target){speakMessages(localMessages,previous);return}
+ const turn=++remoteTurn,status=document.createElement('aside');status.className='notice';status.setAttribute('role','status');
+ const label=document.createElement('span');label.textContent='会話を少し考えています… ';
+ const cancel=document.createElement('button');cancel.textContent='端末内の返答を使う';cancel.onclick=()=>remoteAI.cancel();status.append(label,cancel);document.body.append(status);
+ const stage=setTimeout(()=>{label.textContent='接続先の起動を待っています。勉強はそのまま続けられます。 '},8000);
+ try{
+  const context=new ContextAssembler().assemble(S,now()),result=await remoteAI.generate(remoteRequest(S,userMessage,target.speaker,context));
+  if(turn!==remoteTurn||!S.settings.remoteAI)return;
+  S=app.acceptRemoteReaction(target.id,result);const updated=S.messages.find(m=>m.id===target.id),batch=localMessages.map(m=>m.id===target.id?updated:m);render();speakMessages(batch,previous);
+ }catch{
+  const index=S.messages.findIndex(m=>m.id===target.id),lastUser=S.messages.map(m=>m.speaker).lastIndexOf('user');
+  if(turn===remoteTurn&&index>lastUser){toast('端末内の返答で続けます');speakMessages(localMessages,previous)}
+ }finally{clearTimeout(stage);status.remove()}
+}
 function avatar(who,small=false){const nurse=who==='NurseT',label=nurse?'ナースロボ＿タイプT':'小夜';return `<span class="avatar ${nurse?'avatar-nurse':'avatar-sayo'} ${small?'avatar-small':''}" role="img" aria-label="${label}"><img class="avatar-photo" src="avatar-sheet.png" alt=""></span>`}
 function sayo(compact=false){if(S.settings.quiet)return '';const text=S.reaction?.text||'今日の一歩も、ここに残していこう。';return `<aside class="sayo"><div class="eyebrow">${S.reaction?.speaker==='NurseT'?'ナースロボ＿タイプＴ':'小夜 / SAYO'}</div><p>${E(text)}</p>${compact?'':'<button class="text-button" data-page="chat">会話の続きを開く</button>'}</aside>`}
 function nav(){return `<nav class="nav" aria-label="メインナビゲーション">${[['chat','○','会話'],['home','⌂','今日'],['board','▤','学ぶこと'],['more','⋯','その他']].map(([k,icon,l])=>`<button data-page="${k}" class="${page===k?'current':''}" ${page===k?'aria-current="page"':''}><span aria-hidden="true">${icon}</span>${l}</button>`).join('')}</nav>`}

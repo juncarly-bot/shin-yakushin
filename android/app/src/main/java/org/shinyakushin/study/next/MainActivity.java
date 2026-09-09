@@ -47,6 +47,7 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public void speak(String raw){voice.speak(raw);}
         @JavascriptInterface public void speakBatch(String raw){voice.speakBatch(raw);}
         @JavascriptInterface public void cancelVoice(){voice.cancel();}
+        @JavascriptInterface public void cancelRemoteAI(){if(remoteAI!=null)remoteAI.cancel();}
         @JavascriptInterface public String voiceStatus(){return voice.status();}
         @JavascriptInterface public boolean remoteAIAvailable(){return remoteAI!=null&&remoteAI.available();}
         @JavascriptInterface public String remoteAIEndpoint(){return remoteAI==null?"":remoteAI.endpoint();}

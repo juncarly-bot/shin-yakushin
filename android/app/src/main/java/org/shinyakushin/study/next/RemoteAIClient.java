@@ -17,6 +17,8 @@ final class RemoteAIClient implements AutoCloseable {
     private static final String PREFS="remote_ai_public_config", ENDPOINT="backend_url";
     private final SharedPreferences preferences;
     private volatile String endpoint;
+    private volatile HttpsURLConnection activeConnection;
+    private final java.util.concurrent.atomic.AtomicLong generation=new java.util.concurrent.atomic.AtomicLong();
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
 
     RemoteAIClient(Context context){preferences=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE);endpoint=preferences.getString(ENDPOINT,context.getString(R.string.remote_ai_backend_url)).trim();}
@@ -29,14 +31,18 @@ final class RemoteAIClient implements AutoCloseable {
         final URL url;
         try{url=validEndpoint(endpoint);if(url==null)throw new IOException("not configured");new JSONObject(raw);}
         catch(Exception invalid){callback.failure(requestId);return;}
+        final long ticket=generation.get();
         worker.execute(()->{
+            if(ticket!=generation.get())return;
             HttpsURLConnection connection=null;
             try{
                 connection=(HttpsURLConnection)url.openConnection();
+                activeConnection=connection;
+                if(ticket!=generation.get())return;
                 connection.setInstanceFollowRedirects(false);
                 connection.setRequestMethod("POST");
-                connection.setConnectTimeout(5000);
-                connection.setReadTimeout(14000);
+                connection.setConnectTimeout(8000);
+                connection.setReadTimeout(65000);
                 connection.setDoOutput(true);
                 connection.setRequestProperty("Content-Type","application/json; charset=utf-8");
                 connection.setRequestProperty("Accept","application/json");
@@ -47,9 +53,9 @@ final class RemoteAIClient implements AutoCloseable {
                 String response=readBounded(connection.getInputStream(),MAX_RESPONSE);
                 JSONObject parsed=new JSONObject(response);
                 if(!parsed.optBoolean("ok")||!parsed.has("reaction"))throw new IOException("invalid backend response");
-                callback.success(requestId,parsed.getJSONObject("reaction").toString());
-            }catch(Exception unavailable){callback.failure(requestId);}
-            finally{if(connection!=null)connection.disconnect();}
+                if(ticket==generation.get())callback.success(requestId,parsed.getJSONObject("reaction").toString());
+            }catch(Exception unavailable){if(ticket==generation.get())callback.failure(requestId);}
+            finally{activeConnection=null;if(connection!=null)connection.disconnect();}
         });
     }
 
@@ -67,5 +73,6 @@ final class RemoteAIClient implements AutoCloseable {
             return out.toString(StandardCharsets.UTF_8.name());
         }
     }
-    @Override public void close(){worker.shutdownNow();}
+    void cancel(){generation.incrementAndGet();HttpsURLConnection connection=activeConnection;if(connection!=null)connection.disconnect();}
+    @Override public void close(){cancel();worker.shutdownNow();}
 }

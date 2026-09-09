@@ -6,6 +6,23 @@ import {fresh} from '../app/src/main/assets/domain.js';
 
 globalThis.window={};
 
+test('cancel stops native request and late reply cannot complete the old turn',async()=>{
+ let id,cancelled=0;const host={remoteAIAvailable:()=>true,requestRemoteAI:x=>{id=x},cancelRemoteAI:()=>{cancelled++}};
+ const provider=new RemoteAIProvider(host,100),pending=provider.generate({speaker:'SAYO'});
+ const rejection=assert.rejects(pending,/cancelled/);provider.cancel();provider.resolve(id,JSON.stringify({text:'stale'}));await rejection;
+ assert.equal(cancelled,1);assert.equal(provider.pending.size,0);
+});
+
+test('deadline rejects and ignores later backend reply',async()=>{
+ let id;const provider=new RemoteAIProvider({remoteAIAvailable:()=>true,requestRemoteAI:x=>{id=x}},5);
+ await assert.rejects(provider.generate({}),/timeout/);provider.resolve(id,JSON.stringify({text:'late'}));assert.equal(provider.pending.size,0);
+});
+
+test('malformed remote output releases the request for local fallback',async()=>{
+ let id;const provider=new RemoteAIProvider({remoteAIAvailable:()=>true,requestRemoteAI:x=>{id=x}},100);
+ const pending=provider.generate({}),rejection=assert.rejects(pending,/invalid/);provider.resolve(id,'{}');await rejection;assert.equal(provider.pending.size,0);
+});
+
 class Host{
  constructor(state=fresh()){this.raw=JSON.stringify(state);this.calls=[];this.available=true}
  read(){return JSON.stringify({ok:true,raw:this.raw,error:'',warning:''})}
@@ -44,4 +61,3 @@ test('remote request carries continuity without writable state',()=>{
  const state=fresh(),context={conversation:{currentTopic:'グリフィス'},recentSessions:[]};const value=remoteRequest(state,'それってなんで？','SAYO',context);
  assert.equal(value.speaker,'SAYO');assert.equal(value.context.conversation.currentTopic,'グリフィス');assert.equal('commit' in value,false);
 });
-
