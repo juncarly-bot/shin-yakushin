@@ -65,7 +65,8 @@ jobs:
           accept_download ./download --os android --only c-api --c-api-version "$VOICEVOX_VERSION"
           accept_download ./download --os android --only onnxruntime --onnxruntime-version "$ONNX_VERSION"
           accept_download ./download --only dict
-          accept_download ./download --only models --models-version "$VOICEVOX_VERSION" --models-pattern '{11,15}.vvm'
+          accept_download ./download --only models --models-version "$VOICEVOX_VERSION" --models-pattern '11.vvm'
+          accept_download ./download --only models --models-version "$VOICEVOX_VERSION" --models-pattern '15.vvm'
           cd "$GITHUB_WORKSPACE/android"
           mkdir -p app/src/main/voicevox/include app/src/main/assets/voicevox/dict
           find "$work" -type f -name voicevox_core.h -exec cp {} app/src/main/voicevox/include/voicevox_core.h \;
