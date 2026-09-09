@@ -33,6 +33,11 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          export ANDROID_HOME="$sdk_root"
+          export ANDROID_SDK_ROOT="$sdk_root"
+          export PATH="$sdk_root/cmdline-tools/latest/bin:$sdk_root/cmdline-tools/bin:$sdk_root/platform-tools:$PATH"
+          command -v sdkmanager
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1" "ndk;27.0.12077973"
 
