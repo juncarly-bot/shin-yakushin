@@ -52,6 +52,12 @@ startup logs and checks process liveness rather than hiding an early crash until
 the boot timeout. This is a CI environment failure, not evidence of a device
 storage root cause.
 
+Run 34499240196 exposed the first emulator error: `Unknown AVD name
+[persistence-ci]`, with no `persistence-ci.ini` in the emulator's search directory.
+The workflow now sets both ANDROID_USER_HOME and ANDROID_AVD_HOME to the same
+runner-temporary location for avdmanager and emulator and verifies discovery
+before boot. No SDK/AGP upgrade or device-data changes are involved.
+
 1. Check latest `android-v08-life-balance` head and its CI, including native QA.
 2. If native QA fails, inspect the first failure and nested cause in its log.
 3. If it passes, obtain the installed APK identity and device diagnostic stage.
