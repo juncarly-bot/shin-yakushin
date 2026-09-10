@@ -136,3 +136,37 @@ jobs:
             android/APK-SIGNATURE.txt
             android/regression.txt
             android/app/build/reports/lint-results-debug.*
+
+      - name: Assemble persistence instrumentation APK
+        run: ./gradlew --no-daemon assembleDebugAndroidTest
+
+      - name: Real Android persistence regression
+        timeout-minutes: 20
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          export PATH="$sdk_root/cmdline-tools/latest/bin:$sdk_root/platform-tools:$sdk_root/emulator:$PATH"
+          sdkmanager "emulator" "system-images;android-35;google_apis;x86_64"
+          echo no | avdmanager create avd --name persistence-ci --package "system-images;android-35;google_apis;x86_64" --device pixel_6
+          acceleration=off
+          if test -r /dev/kvm && test -w /dev/kvm; then acceleration=on; fi
+          emulator -avd persistence-ci -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel "$acceleration" > emulator-persistence.log 2>&1 &
+          emulator_pid=$!
+          trap 'kill "$emulator_pid" 2>/dev/null || true' EXIT
+          timeout 600 bash -c 'until adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d "\r" | grep -q "^1$"; do sleep 2; done'
+          adb -s emulator-5554 install app/build/outputs/apk/debug/app-debug.apk
+          adb -s emulator-5554 install app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          adb -s emulator-5554 shell am instrument -w org.shinyakushin.study.next.v07.preview.test/org.shinyakushin.study.next.PersistenceQa | tee persistence-qa.txt
+          grep -q "PERSISTENCE_QA passed=7 failed=0" persistence-qa.txt
+
+      - name: Upload persistence evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shin-yakushin-v08-persistence-evidence
+          if-no-files-found: warn
+          path: |
+            android/persistence-qa.txt
+            android/emulator-persistence.log
+
