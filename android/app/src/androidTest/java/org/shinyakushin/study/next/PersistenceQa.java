@@ -88,6 +88,13 @@ public final class PersistenceQa extends Instrumentation {
             check(Arrays.equals(old,Files.readAllBytes(bak.toPath())),"backup changed");
             check(Arrays.equals(partial,Files.readAllBytes(pending.toPath())),"partial changed");
         });
+        test("Usage access denied is an empty result without stopping storage",()->{
+            AppUsageRepository usage=new AppUsageRepository(getTargetContext());
+            check(!usage.hasUsageAccess(),"CI fixture unexpectedly has Usage permission");
+            check(usage.todayDurations(System.currentTimeMillis()).isEmpty(),"denied usage was not empty");
+            Context c=isolated("usage-denied");StateStore s=new StateStore(c);
+            try{s.commit(-1,fixture(),false);check(s.read()!=null,"storage unavailable without Usage access");}finally{s.close();}
+        });
         result.append("PERSISTENCE_QA passed="+passed+" failed="+failed+"\n");
         Bundle bundle=new Bundle();bundle.putString("stream",result.toString());finish(failed==0?-1:0,bundle);
     }
