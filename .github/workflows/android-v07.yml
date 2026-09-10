@@ -29,8 +29,9 @@ jobs:
 
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
+
+      - name: Bootstrap verified Gradle Wrapper 8.9
+        run: bash tools/bootstrap-wrapper.sh
 
       - name: Install Android SDK contract
         shell: bash
@@ -102,31 +103,22 @@ jobs:
           sha256sum -c SHA256SUMS-VOICEVOX-v07.txt
 
       - name: Clean
-        run: gradle --no-daemon clean
+        run: ./gradlew --no-daemon clean
 
       - name: Assemble debug APK
-        run: gradle --no-daemon assembleDebug
+        run: ./gradlew --no-daemon assembleDebug
 
       - name: Lint debug
-        run: gradle --no-daemon lintDebug
+        run: ./gradlew --no-daemon lintDebug
 
       - name: Regression tests
-        run: node --test tests/*.test.mjs
+        run: node --test tests/*.test.mjs | tee regression.txt
 
       - name: APK metadata and secret scan
         shell: bash
         run: |
           set -euo pipefail
-          apk="app/build/outputs/apk/debug/app-debug.apk"
-          test -s "$apk"
-          sha256sum "$apk" | tee APK-SHA256SUMS.txt
-          unzip -p "$apk" AndroidManifest.xml >/dev/null
-          if unzip -p "$apk" | strings | grep -E 'OPENAI_API_KEY|api\.openai\.com|sk-[A-Za-z0-9_-]{20,}|Authorization: Bearer'; then
-            echo 'secret-like content found in APK' >&2
-            exit 1
-          fi
-          echo "applicationId=org.shinyakushin.study.next.v07.preview" | tee APK-METADATA.txt
-          stat -c 'size_bytes=%s' "$apk" | tee -a APK-METADATA.txt
+          python3 tools/verify_apk.py app/build/outputs/apk/debug/app-debug.apk org.shinyakushin.study.next.v07.preview
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -136,4 +128,8 @@ jobs:
           path: |
             android/app/build/outputs/apk/debug/app-debug.apk
             android/APK-SHA256SUMS.txt
-            android/APK-METADATA.txt
+            android/APK-METADATA.json
+            android/APK-BADGING.txt
+            android/APK-SIGNATURE.txt
+            android/regression.txt
+            android/app/build/reports/lint-results-debug.*
