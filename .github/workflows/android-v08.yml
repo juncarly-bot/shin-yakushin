@@ -153,8 +153,20 @@ jobs:
           if test -r /dev/kvm && test -w /dev/kvm; then acceleration=on; fi
           emulator -avd persistence-ci -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel "$acceleration" > emulator-persistence.log 2>&1 &
           emulator_pid=$!
-          trap 'kill "$emulator_pid" 2>/dev/null || true' EXIT
-          timeout 600 bash -c 'until adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d "\r" | grep -q "^1$"; do sleep 2; done'
+          trap 'tail -100 emulator-persistence.log; kill "$emulator_pid" 2>/dev/null || true' EXIT
+          booted=false
+          for attempt in {1..300}; do
+            if ! kill -0 "$emulator_pid" 2>/dev/null; then
+              echo "Emulator exited before Android boot; see startup log below"
+              exit 1
+            fi
+            if adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d "\r" | grep -q '^1$'; then
+              booted=true
+              break
+            fi
+            sleep 2
+          done
+          test "$booted" = true
           adb -s emulator-5554 install app/build/outputs/apk/debug/app-debug.apk
           adb -s emulator-5554 install app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           adb -s emulator-5554 shell am instrument -w org.shinyakushin.study.next.v07.preview.test/org.shinyakushin.study.next.PersistenceQa | tee persistence-qa.txt
