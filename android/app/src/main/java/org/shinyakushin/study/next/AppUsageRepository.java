@@ -77,7 +77,7 @@ public final class AppUsageRepository {
             UsageEvents.Event event = new UsageEvents.Event();
             while (events.hasNextEvent()) {
                 events.getNextEvent(event);
-                intervals.accept(event.getTimeStamp(), event.getEventType(), event.getPackageName());
+                intervals.accept(event.getTimeStamp(), event.getEventType(), event.getPackageName(), event.getClassName());
             }
             return intervals.finish();
         } catch (RuntimeException ignored) { return Collections.emptyMap(); }

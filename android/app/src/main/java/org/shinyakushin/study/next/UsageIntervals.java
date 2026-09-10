@@ -10,6 +10,7 @@ public final class UsageIntervals {
     private final long start, end;
     private long previous = Long.MIN_VALUE, opened;
     private String active;
+    private String activity;
     private boolean ordered = true;
     private final Map<String, Long> totals = new HashMap<>();
     public UsageIntervals(long start, long end) {
@@ -20,13 +21,18 @@ public final class UsageIntervals {
         return Instant.ofEpochMilli(now).atZone(zone).toLocalDate().atStartOfDay(zone).toInstant().toEpochMilli();
     }
     public void accept(long at, int type, String pkg) {
+        accept(at, type, pkg, null);
+    }
+    public void accept(long at, int type, String pkg, String className) {
         // Do not sort clock rollbacks into invented foreground sessions.
         if (at < previous) { ordered = false; active = null; totals.clear(); return; }
         previous = at;
         if (!ordered || at > end) return;
         if (type == 1 && pkg != null) {
             if (!pkg.equals(active)) { close(at); active = pkg; opened = at; }
-        } else if ((type == 2 || type == 23) && pkg != null && pkg.equals(active)) {
+            activity = className;
+        } else if ((type == 2 || type == 23) && pkg != null && pkg.equals(active)
+                && java.util.Objects.equals(activity, className)) {
             close(at);
         } else if (type == 16 || type == 17 || type == 18 || type == 26) {
             // Screen off, shutdown, startup, or keyguard shown ends observation.

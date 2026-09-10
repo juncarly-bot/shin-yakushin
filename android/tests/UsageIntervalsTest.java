@@ -11,6 +11,9 @@ public class UsageIntervalsTest {
         UsageIntervals duplicate=new UsageIntervals(0,200);
         duplicate.accept(10,1,"x");duplicate.accept(10,1,"x");duplicate.accept(30,2,"x");duplicate.accept(30,2,"x");
         eq(duplicate.finish().get("x"),20L);
+        UsageIntervals activities=new UsageIntervals(0,200);
+        activities.accept(10,1,"x","A");activities.accept(20,1,"x","B");activities.accept(30,23,"x","A");activities.accept(40,2,"x","B");
+        eq(activities.finish().get("x"),30L);
         UsageIntervals reboot=new UsageIntervals(0,200);
         reboot.accept(10,1,"x");reboot.accept(20,17,null);reboot.accept(80,18,null);reboot.accept(100,1,"x");reboot.accept(110,16,null);
         eq(reboot.finish().get("x"),20L);
