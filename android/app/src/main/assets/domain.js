@@ -15,7 +15,7 @@ const uuid=()=>crypto.randomUUID();
 export const dateKey=(t,offset=540)=>new Date(t+offset*60000).toISOString().slice(0,10);
 export const dateMs=(d,offset=540)=>{if(typeof d!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(d))fail('日付が不正です');const t=Date.parse(d+'T00:00:00Z');if(!Number.isFinite(t)||new Date(t).toISOString().slice(0,10)!==d)fail('日付が不正です');return t-offset*60000};
 export const shiftDate=(d,n)=>dateKey(dateMs(d,0)+n*86400000,0);
-export const fresh=()=>({schemaVersion:VERSION,revision:0,sessions:[],materials:[],goals:[],tasks:[],plans:[],memories:[],visits:[],progressEvents:[],dialogueHistory:{},reaction:null,settings:{name:'',utcOffsetMinutes:540,breakMinutes:5,quiet:false,notifications:false,remoteAI:false},lastSeen:null});
+export const fresh=()=>({schemaVersion:VERSION,revision:0,sessions:[],materials:[],goals:[],tasks:[],plans:[],memories:[],visits:[],progressEvents:[],dialogueHistory:{},reaction:null,settings:{name:'',utcOffsetMinutes:540,breakMinutes:5,quiet:false,notifications:false,remoteAI:false,lifeBalance:{dailyMode:'NORMAL',budgetMinutes:{NORMAL:90,HOLIDAY:180,FOCUS:60},interventionLevel:'NORMAL',cooldownMinutes:120,usageInConversation:true,usageNotifications:true,appCategories:{}}},lastSeen:null});
 export const active=s=>s.sessions.find(x=>x.endTimestamp===null);
 export const entity=(s,k,id)=>s[k].find(x=>x.id===id);
 export function totals(x,now){const r={study:0,break:0,pause:0};for(const p of x.segments)r[p.kind]+=Math.max(0,(p.end??now)-p.start)/1000;return r}
@@ -62,7 +62,7 @@ export function apply(state,action,p={},now=Date.now()){
  if(k==='materials'||k==='goals'){const target=num(p.target??100,1),progress=num(p.progress??0,0,target);Object.assign(o,{target,progress,unit:str(p.unit??(k==='materials'?'ページ':'%'),30)});if(!old||old.progress!==progress){s.progressEvents.push({id:uuid(),kind:k,relatedId:o.id,title,before:old?.progress??0,after:progress,timestamp:now});if(progress>0){event='progress';context={title,progress,target,unit:o.unit};remember(s,'progress',`${title}：${progress} ${o.unit}へ。`,now,uuid())}}o.completedAt=progress>=target?o.completedAt??now:null;if(o.completedAt&&(!old||!old.completedAt)){event='goal';context={title};remember(s,'achievement',`${title}を達成した。`,now,o.id,5)}}
  else{Object.assign(o,relations(s,p));o.done=!!p.done;o.completedAt=o.done?o.completedAt??now:null;if(k==='plans'){dateMs(p.date);o.date=p.date}if(o.done&&!old?.done){event='task';context={title};remember(s,'task',`${title}を終えた。`,now,o.id,2)}}break}
  case 'memory':{if(s.memories.filter(m=>m.category==='manual').length>=100)fail('手動の思い出は100件までです');const t=str(p.text);if(!t)fail('思い出を入力してください');remember(s,'manual',t,now,null,5);event='memory';break}
- case 'settings':{s.settings={...s.settings,...(p.voice?{voice:p.voice}:{}),name:str(p.name??'',80),utcOffsetMinutes:num(p.utcOffsetMinutes??540,-720,840),breakMinutes:num(p.breakMinutes??5,1,180),quiet:!!p.quiet,notifications:!!p.notifications,remoteAI:!!p.remoteAI};break}
+ case 'settings':{s.settings={...s.settings,...(p.voice?{voice:p.voice}:{}),name:str(p.name??'',80),utcOffsetMinutes:num(p.utcOffsetMinutes??540,-720,840),breakMinutes:num(p.breakMinutes??5,1,180),quiet:!!p.quiet,notifications:!!p.notifications,remoteAI:!!p.remoteAI,lifeBalance:p.lifeBalance??s.settings.lifeBalance};break}
  case 'interact':event='interact';break;
  case 'review':event=p.weekly?'weeklyReview':'dailyReview';break;
  default:fail('不明な操作です');
