@@ -33,6 +33,9 @@ jobs:
       - name: Bootstrap verified Gradle Wrapper 8.9
         run: bash tools/bootstrap-wrapper.sh
 
+      - name: Ensure wrapper executable
+        run: chmod +x gradlew
+
       - name: Install Android SDK contract
         shell: bash
         run: |
