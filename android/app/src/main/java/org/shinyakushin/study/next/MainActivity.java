@@ -22,18 +22,19 @@ public final class MainActivity extends Activity {
     private StateStore store;
     private VoiceController voice;
     private RemoteAIClient remoteAI;
+    private AppUsageRepository appUsage;
     private final ExecutorService io=Executors.newSingleThreadExecutor();
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
         try{store=new StateStore(this);}catch(Exception ex){TextView text=new TextView(this);text.setPadding(32,80,32,32);text.setText("記録を開けませんでした\n\n"+ex.getMessage()+"\n\n元データは保持しています。アプリのデータを消去しないでください。");setContentView(text);return;}
-        voice=new VoiceController(this);remoteAI=new RemoteAIClient(this);web=new WebView(this);web.setBackgroundColor(Color.rgb(245,244,238));setContentView(web);
+        voice=new VoiceController(this);remoteAI=new RemoteAIClient(this);appUsage=new AppUsageRepository(this);web=new WebView(this);web.setBackgroundColor(Color.rgb(245,244,238));setContentView(web);
         web.setOnApplyWindowInsetsListener((view,insets)->{if(Build.VERSION.SDK_INT>=30){android.graphics.Insets bar=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.ime());view.setPadding(bar.left,bar.top,bar.right,bar.bottom);}else view.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());return insets;});
         WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(false);settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);settings.setJavaScriptCanOpenWindowsAutomatically(false);settings.setSupportMultipleWindows(false);
         web.addJavascriptInterface(new Bridge(),"AndroidStore");
         web.setWebViewClient(new WebViewClient(){
             @Override public boolean shouldOverrideUrlLoading(WebView w,WebResourceRequest r){return true;}
             @Override public WebResourceResponse shouldInterceptRequest(WebView w,WebResourceRequest req){
-                Uri u=req.getUrl();String path=u.getPath();Set<String> allowed=new HashSet<>(Arrays.asList("/index.html","/ui.js","/domain.js","/reactions.js","/templates.js","/platform.js","/style.css","/avatar-sheet.png","/timeline.js","/orchestrator.js","/conversation.js","/conversation-shape.js","/characters.js","/companion.js","/voice-settings.js","/remote-ai.js"));
+                Uri u=req.getUrl();String path=u.getPath();Set<String> allowed=new HashSet<>(Arrays.asList("/index.html","/ui.js","/domain.js","/reactions.js","/templates.js","/platform.js","/style.css","/avatar-sheet.png","/timeline.js","/orchestrator.js","/conversation.js","/conversation-shape.js","/characters.js","/companion.js","/voice-settings.js","/remote-ai.js","/life-balance.js"));
                 if(!"https".equals(u.getScheme())||!"appassets.androidplatform.net".equals(u.getHost())||!allowed.contains(path))return response("text/plain",404,"Not found",new ByteArrayInputStream(new byte[0]));
                 try{return response(path.endsWith(".js")?"text/javascript":path.endsWith(".css")?"text/css":path.endsWith(".png")?"image/png":"text/html",200,"OK",getAssets().open(path.substring(1)));}catch(IOException ex){return response("text/plain",404,"Not found",new ByteArrayInputStream(new byte[0]));}
             }
@@ -65,6 +66,8 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public void importData(){runOnUiThread(()->{Intent i=new Intent(Intent.ACTION_GET_CONTENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,IMPORT);});}
         @JavascriptInterface public void enableNotifications(){runOnUiThread(()->{if(Build.VERSION.SDK_INT>=33&&!BreakReceiver.permitted(MainActivity.this))requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NOTIFICATIONS);else{BreakReceiver.schedule(MainActivity.this,store.read());message("通知の設定を確認しました。休憩は通知なしでも利用できます。");}});}
         @JavascriptInterface public boolean notificationAllowed(){return BreakReceiver.permitted(MainActivity.this)&&getSystemService(NotificationManager.class).areNotificationsEnabled();}
+        @JavascriptInterface public boolean usageAccessAllowed(){return appUsage!=null&&appUsage.hasUsageAccess();}
+        @JavascriptInterface public void openUsageAccessSettings(){runOnUiThread(()->{try{startActivity(appUsage.usageAccessIntent());}catch(RuntimeException ex){message("使用状況へのアクセス設定を開けませんでした。");}});}
     }
     private void message(String text){runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformMessage && window.platformMessage("+JSONObject.quote(text)+")",null);});}
     private void remoteFailure(String requestId){runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformRemoteAIError && window.platformRemoteAIError("+JSONObject.quote(requestId)+")",null);});}
