@@ -79,6 +79,15 @@ public final class PersistenceQa extends Instrumentation {
                 check(old.equals(StateStore.readAtomic(new File(c.getFilesDir(),"study.backup.json"))),"failed commit changed backup");
             }finally{s.close();}
         });
+        test("backup candidate read never renames or deletes partial originals",()->{
+            Context c=isolated("atomic");File file=new File(c.getFilesDir(),"candidate.json"),bak=new File(file+".bak"),pending=new File(file+".new");
+            byte[] partial="{partial".getBytes(StandardCharsets.UTF_8),old=fixture().getBytes(StandardCharsets.UTF_8);
+            Files.write(file.toPath(),partial);Files.write(bak.toPath(),old);Files.write(pending.toPath(),partial);
+            check(fixture().equals(StateStore.readAtomic(file)),"wrong committed candidate");
+            check(Arrays.equals(partial,Files.readAllBytes(file.toPath())),"base changed");
+            check(Arrays.equals(old,Files.readAllBytes(bak.toPath())),"backup changed");
+            check(Arrays.equals(partial,Files.readAllBytes(pending.toPath())),"partial changed");
+        });
         result.append("PERSISTENCE_QA passed="+passed+" failed="+failed+"\n");
         Bundle bundle=new Bundle();bundle.putString("stream",result.toString());finish(failed==0?-1:0,bundle);
     }

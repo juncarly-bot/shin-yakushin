@@ -158,7 +158,7 @@ jobs:
           adb -s emulator-5554 install app/build/outputs/apk/debug/app-debug.apk
           adb -s emulator-5554 install app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           adb -s emulator-5554 shell am instrument -w org.shinyakushin.study.next.v07.preview.test/org.shinyakushin.study.next.PersistenceQa | tee persistence-qa.txt
-          grep -q "PERSISTENCE_QA passed=7 failed=0" persistence-qa.txt
+          grep -q "PERSISTENCE_QA passed=8 failed=0" persistence-qa.txt
 
       - name: Upload persistence evidence
         if: always()
@@ -169,4 +169,3 @@ jobs:
           path: |
             android/persistence-qa.txt
             android/emulator-persistence.log
-

@@ -84,7 +84,16 @@ public final class StateStore {
         try{stream=atomic.startWrite();stream.write(raw.getBytes(StandardCharsets.UTF_8));atomic.finishWrite(stream);}
         catch(IOException ex){if(stream!=null)atomic.failWrite(stream);throw ex;}
     }
-    static String readAtomic(File file) throws IOException {return new String(new AtomicFile(file).readFully(),StandardCharsets.UTF_8);}
+    static String readAtomic(File file) throws IOException {
+        // AtomicFile.openRead() can rename .bak and delete partial files before validation.
+        // Select its committed candidate without modifying either copy.
+        File backup=new File(file.getPath()+".bak");File candidate=backup.exists()?backup:file;
+        try(InputStream in=new FileInputStream(candidate);ByteArrayOutputStream out=new ByteArrayOutputStream()){
+            byte[] buffer=new byte[8192];int n;
+            while((n=in.read(buffer))!=-1){if(out.size()+n>25_000_000)throw new IOException("25 MBを超えるデータは読み込めません");out.write(buffer,0,n);}
+            return new String(out.toByteArray(),StandardCharsets.UTF_8);
+        }
+    }
     public static JSONObject active(JSONObject s) throws JSONException {JSONArray a=s.getJSONArray("sessions");for(int i=0;i<a.length();i++){JSONObject x=a.getJSONObject(i);if(x.isNull("endTimestamp"))return x;}return null;}
     static final class UnsupportedVersion extends IOException {UnsupportedVersion(){super("対応していない保存バージョンです。元データは変更していません。");}}
     private static void require(boolean v,String m) throws IOException{if(!v)throw new IOException(m);}
