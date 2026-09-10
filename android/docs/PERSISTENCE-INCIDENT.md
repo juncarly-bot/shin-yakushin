@@ -58,6 +58,11 @@ The workflow now sets both ANDROID_USER_HOME and ANDROID_AVD_HOME to the same
 runner-temporary location for avdmanager and emulator and verifies discovery
 before boot. No SDK/AGP upgrade or device-data changes are involved.
 
+Run 34535836991 found the AVD successfully, then reported insufficient disk for
+its default userdata partition (needed 7372.80 MB, available 5366.18 MB).
+The newly created CI-only AVD now uses a 2G data partition. No existing data or
+runner directories are deleted to make space.
+
 1. Check latest `android-v08-life-balance` head and its CI, including native QA.
 2. If native QA fails, inspect the first failure and nested cause in its log.
 3. If it passes, obtain the installed APK identity and device diagnostic stage.
