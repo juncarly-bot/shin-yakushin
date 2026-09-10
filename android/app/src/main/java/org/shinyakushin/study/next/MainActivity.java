@@ -67,6 +67,10 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public void enableNotifications(){runOnUiThread(()->{if(Build.VERSION.SDK_INT>=33&&!BreakReceiver.permitted(MainActivity.this))requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NOTIFICATIONS);else{BreakReceiver.schedule(MainActivity.this,store.read());message("通知の設定を確認しました。休憩は通知なしでも利用できます。");}});}
         @JavascriptInterface public boolean notificationAllowed(){return BreakReceiver.permitted(MainActivity.this)&&getSystemService(NotificationManager.class).areNotificationsEnabled();}
         @JavascriptInterface public boolean usageAccessAllowed(){return appUsage!=null&&appUsage.hasUsageAccess();}
+        @JavascriptInterface public void requestLaunchableApps(){io.execute(()->{
+            String catalog=LaunchableApps.read(MainActivity.this);
+            runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformLaunchableApps && window.platformLaunchableApps("+JSONObject.quote(catalog)+")",null);});
+        });}
         @JavascriptInterface public void openUsageAccessSettings(){runOnUiThread(()->{try{startActivity(appUsage.usageAccessIntent());}catch(RuntimeException ex){message("使用状況へのアクセス設定を開けませんでした。");}});}
     }
     private void message(String text){runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformMessage && window.platformMessage("+JSONObject.quote(text)+")",null);});}
