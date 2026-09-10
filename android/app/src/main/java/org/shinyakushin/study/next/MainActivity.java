@@ -67,6 +67,13 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public void enableNotifications(){runOnUiThread(()->{if(Build.VERSION.SDK_INT>=33&&!BreakReceiver.permitted(MainActivity.this))requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NOTIFICATIONS);else{BreakReceiver.schedule(MainActivity.this,store.read());message("通知の設定を確認しました。休憩は通知なしでも利用できます。");}});}
         @JavascriptInterface public boolean notificationAllowed(){return BreakReceiver.permitted(MainActivity.this)&&getSystemService(NotificationManager.class).areNotificationsEnabled();}
         @JavascriptInterface public boolean usageAccessAllowed(){return appUsage!=null&&appUsage.hasUsageAccess();}
+        @JavascriptInterface public void requestDailyBalance(){io.execute(()->{
+            String summary;
+            try{summary=LifeBalanceSnapshot.read(MainActivity.this,store.read(),System.currentTimeMillis()).toString();}
+            catch(Exception ex){summary="{\"permissionGranted\":false}";}
+            final String value=summary;
+            runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformDailyBalance && window.platformDailyBalance("+JSONObject.quote(value)+")",null);});
+        });}
         @JavascriptInterface public void requestLaunchableApps(){io.execute(()->{
             String catalog=LaunchableApps.read(MainActivity.this);
             runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformLaunchableApps && window.platformLaunchableApps("+JSONObject.quote(catalog)+")",null);});
