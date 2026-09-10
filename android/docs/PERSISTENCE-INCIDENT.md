@@ -63,6 +63,14 @@ its default userdata partition (needed 7372.80 MB, available 5366.18 MB).
 The newly created CI-only AVD now uses a 2G data partition. No existing data or
 runner directories are deleted to make space.
 
+Correction after run 34536417003: the emulator raises first-boot data partitions
+to at least 6 GiB for API >=24, so the 2G setting did not take effect. It was
+removed. Persistence now runs in a separate fresh hosted job that downloads the
+already-built application and instrumentation APKs; this avoids sharing scarce
+disk with the full NDK/Gradle/VOICEVOX build environment. No cache or existing
+data deletion is used. Source: Android QEMU `android-qemu2-glue/main.cpp`,
+`kMinPlaystoreImageSize` and `myApiLevel >= 24` branch.
+
 1. Check latest `android-v08-life-balance` head and its CI, including native QA.
 2. If native QA fails, inspect the first failure and nested cause in its log.
 3. If it passes, obtain the installed APK identity and device diagnostic stage.
