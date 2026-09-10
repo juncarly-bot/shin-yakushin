@@ -15,21 +15,26 @@ public final class StateStore {
     private final File file;
     private SQLiteDatabase db;
     private String warning="";
+    private String loadStage="OPEN";
     public StateStore(Context context) throws Exception {
         this.context=context.getApplicationContext();file=new File(context.getFilesDir(),"study.sqlite3");
         boolean existedBefore=file.exists();
         try {
-            open(); String raw=read();
-            if(raw!=null) validate(raw);
+            open(); loadStage="READ"; String raw=read();
+            if(raw!=null){loadStage="VALIDATE";validate(raw);}
             else {
                 File backup=new File(context.getFilesDir(),"study.backup.json");
-                if(existedBefore||backup.exists()||new File(backup+".bak").exists())throw new IOException("保存行が見つかりません");
+                if(existedBefore||backup.exists()||new File(backup+".bak").exists()){loadStage="MISSING_ROW";throw new IOException("保存行が見つかりません");}
             }
         }
         catch(UnsupportedVersion ex){close();throw ex;}
         catch(Exception ex){
             close(); File backup=new File(context.getFilesDir(),"study.backup.json");
-            if(!backup.exists()&&!new File(backup+".bak").exists())throw new IOException("保存データを開けません。元データを保持しています。",ex);
+            // A validation, permission, disk or query failure is not evidence of corruption.
+            // Never replace a readable newer state with an older automatic backup.
+            if(!(ex instanceof android.database.sqlite.SQLiteDatabaseCorruptException)
+                    ||(!backup.exists()&&!new File(backup+".bak").exists()))
+                throw new IOException("保存データを開けません。元データを保持しています。\n診断: STORE-"+loadStage+"-"+ex.getClass().getSimpleName(),ex);
             String recovered=readAtomic(backup);validate(recovered);
             String suffix=".corrupt-"+System.currentTimeMillis();
             // Preserve the original files; never use SQLite's default deletion handler.
@@ -40,9 +45,13 @@ public final class StateStore {
         }
     }
     private void open() throws Exception {
-        db=SQLiteDatabase.openDatabase(file.getAbsolutePath(),null,SQLiteDatabase.CREATE_IF_NECESSARY,database->{throw new android.database.sqlite.SQLiteException("データ破損を検出。元ファイルは保持します");});
+        loadStage="OPEN";
+        db=SQLiteDatabase.openDatabase(file.getAbsolutePath(),null,SQLiteDatabase.CREATE_IF_NECESSARY,database->{throw new android.database.sqlite.SQLiteDatabaseCorruptException("データ破損を検出。元ファイルは保持します");});
+        loadStage="SYNC";
         db.execSQL("PRAGMA synchronous=FULL");
-        try(Cursor c=db.rawQuery("PRAGMA quick_check",null)){if(!c.moveToFirst()||!"ok".equals(c.getString(0)))throw new IOException("DB integrity failed");}
+        loadStage="INTEGRITY";
+        try(Cursor c=db.rawQuery("PRAGMA quick_check",null)){if(!c.moveToFirst()||!"ok".equals(c.getString(0)))throw new android.database.sqlite.SQLiteDatabaseCorruptException("DB integrity failed");}
+        loadStage="TABLE";
         db.execSQL("CREATE TABLE IF NOT EXISTS state (id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL, payload TEXT NOT NULL)");
     }
     private void insert(String raw,long revision){db.beginTransaction();try{db.execSQL("INSERT INTO state(id,revision,payload) VALUES(1,?,?)",new Object[]{revision,raw});db.setTransactionSuccessful();}finally{db.endTransaction();}}
@@ -51,6 +60,13 @@ public final class StateStore {
     public synchronized void commit(long expected,String raw,boolean restore) throws Exception {
         JSONObject next=validate(raw);String previous=read();long current=previous==null?-1:new JSONObject(previous).getLong("revision");
         if(current!=expected||next.getLong("revision")!=current+1)throw new IOException("ほかの操作で記録が更新されています。読み込み直してください");
+        if(previous!=null&&!new JSONObject(previous).getJSONObject("settings").has("lifeBalance")
+                &&next.getJSONObject("settings").has("lifeBalance")){
+            File original=new File(context.getFilesDir(),"before-life-balance-r"+current+".json");
+            if(original.exists()){
+                if(!readAtomic(original).equals(previous))throw new IOException("移行元のバックアップが一致しないため保存を中止しました");
+            }else writeAtomic(original,previous);
+        }
         if(restore&&previous!=null){if(active(new JSONObject(previous))!=null)throw new IOException("学習を終了してから復元してください");writeAtomic(new File(context.getFilesDir(),"before-import-"+System.currentTimeMillis()+".json"),previous);}
         db.beginTransaction();try{
             if(previous==null)db.execSQL("INSERT INTO state VALUES(1,?,?)",new Object[]{next.getLong("revision"),raw});
