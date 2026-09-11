@@ -34,7 +34,9 @@ test('CI decodes the keystore into RUNNER_TEMP and never into the repository',()
  assert.match(workflow,/keystore=\"\$RUNNER_TEMP\/shin-yakushin-rc\.p12\"/);
  assert.match(workflow,/echo \"RC_KEYSTORE_FILE=\$keystore\"/);
  assert.match(workflow,/\} >> \"\$GITHUB_ENV\"/,'signing env is exported through GITHUB_ENV');
- assert.match(workflow,/if: \$\{\{ secrets\.RC_KEYSTORE_BASE64 != '' \}\}/,'the step is skipped when the secret is absent');
+ assert.match(workflow,/if \[ -z "\$\{RC_KEYSTORE_BASE64:-\}" \]; then/,'no secrets context in a step if; guard at runtime');
+ assert.match(workflow,/falling back to the throwaway debug key/);
+ assert.ok(!/if: \$\{\{ secrets\./.test(workflow),'secrets is not an allowed context in step-level if');
 });
 
 test('the APK verifier pins the RC certificate and records it',()=>{

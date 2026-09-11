@@ -106,7 +106,6 @@ jobs:
           sha256sum -c SHA256SUMS-VOICEVOX-v07.txt
 
       - name: Configure persistent preview signing
-        if: ${{ secrets.RC_KEYSTORE_BASE64 != '' }}
         shell: bash
         env:
           RC_KEYSTORE_BASE64: ${{ secrets.RC_KEYSTORE_BASE64 }}
@@ -115,6 +114,11 @@ jobs:
           RC_KEY_PASSWORD: ${{ secrets.RC_KEY_PASSWORD }}
         run: |
           set -euo pipefail
+          # The secrets context is not allowed in step-level `if`, so decide here.
+          if [ -z "${RC_KEYSTORE_BASE64:-}" ]; then
+            echo "::warning::RC signing secrets are absent; falling back to the throwaway debug key"
+            exit 0
+          fi
           keystore="$RUNNER_TEMP/shin-yakushin-rc.p12"
           printf '%s' "$RC_KEYSTORE_BASE64" | base64 --decode > "$keystore"
           chmod 600 "$keystore"
