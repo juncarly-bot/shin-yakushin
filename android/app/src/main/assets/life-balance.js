@@ -47,3 +47,16 @@ export function coachingMessage(decision={},budget={}){
   const over=Math.max(0,Number(budget.exceededMinutes||0));
   return decision.speaker==='NurseT'?`娯楽が予定を${over}分超えています。そろそろ学習の続きに戻りませんか？`:'少し休んだら、学習の続きに戻ろう。';
 }
+
+/** Privacy-safe copy shared with the notification layer; never contains usage minutes. */
+export const InterventionCopy=Object.freeze({
+  TITLE_NURSE_T:'Tから呼ばれています', TITLE_SAYO:'小夜から',
+  BODY_RETURN:'そろそろ戻ってきませんか？', BODY_GENTLE:'少し休んだら、学習の続きに戻ろう。',
+  BODY_GOAL_COMPLETE:'今日の目標まで届いたね。よく頑張った。'
+});
+/** Local reconstruction of the intervention message; the Intent only carries ids. */
+export function interventionMessage(reason,speaker){
+  const title=speaker==='NurseT'?InterventionCopy.TITLE_NURSE_T:InterventionCopy.TITLE_SAYO;
+  const body=reason==='goal-complete'?InterventionCopy.BODY_GOAL_COMPLETE:speaker==='NurseT'?InterventionCopy.BODY_RETURN:InterventionCopy.BODY_GENTLE;
+  return {title,body};
+}

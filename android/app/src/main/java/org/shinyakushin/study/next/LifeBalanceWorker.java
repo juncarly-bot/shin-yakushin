@@ -48,7 +48,8 @@ public final class LifeBalanceWorker extends Worker {
         CoachingPolicy.Decision decision=CoachingPolicy.decide(input);
         String day=snapshot.optString("day","");
         String interventionId=CoachingPolicy.interventionId(day,input.dailyMode,decision,decision.exceededMinutes);
-        Log.i(TAG,"checked reason="+decision.reason+" speaker="+(decision.speaker==null?"none":decision.speaker)
+        boolean notified=LifeBalanceNotifier.maybeNotify(context,decision,interventionId,day,now,lifeBalance);
+        Log.i(TAG,"checked notified="+notified+" reason="+decision.reason+" speaker="+(decision.speaker==null?"none":decision.speaker)
             +" level="+decision.level+" actionable="+decision.actionable()+" id="+interventionId
             +" usage="+input.usedMinutes+" study="+input.studyCompletedMinutes+"/"+input.studyGoalMinutes);
         return Result.success();
