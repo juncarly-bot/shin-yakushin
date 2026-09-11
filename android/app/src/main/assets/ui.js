@@ -46,18 +46,20 @@ function speakMessages(messages,previous){try{const request=speechRequest(S,prev
 function command(a,p={},deferVoice=false){try{const previous=S?.reaction;if(a==='chat'){host.cancelVoice?.();remoteAI?.cancel()}S=app.command(a,p);if(a==='settings')host.cancelVoice?.();if(!deferVoice)speakMessages(app.lastVoiceMessages,previous);if(app.warning)toast(app.warning);return true}catch(e){S=app.state;toast(e.message);return false}}
 let remoteTurn=0;
 async function enhanceConversation(localMessages,userMessage,previous){
- const speakers=(localMessages??[]).map(m=>m.speaker).filter(s=>['SAYO','NurseT'].includes(s));
- const target=(localMessages??[]).find(m=>['SAYO','NurseT'].includes(m.speaker));
- if(!target){speakMessages(localMessages,previous);return}
- const turn=++remoteTurn;showTyping(speakers.length?speakers:[target.speaker]);latency.mark('remote_request_started_at');
+ const targets=(localMessages??[]).filter(m=>['SAYO','NurseT'].includes(m.speaker));
+ if(!targets.length){speakMessages(localMessages,previous);return}
+ const plan={order:targets.map(m=>m.speaker),allowedSpeakers:[...new Set(targets.map(m=>m.speaker))],maxMessages:Math.min(3,targets.length)};
+ const turn=++remoteTurn;showTyping(plan.order);latency.mark('remote_request_started_at');
  const stage=setTimeout(()=>{if(pendingTyping){pendingTyping.text='接続先の起動を待っています。';const t=document.querySelector('.typing .typing-text');if(t)t.textContent=pendingTyping.text}},8000);
  try{
-  const context=new ContextAssembler().assemble(S,now(),userMessage),result=await remoteAI.generate(remoteRequest(S,userMessage,target.speaker,context));
+  const context=new ContextAssembler().assemble(S,now(),userMessage),result=await remoteAI.generate(remoteRequest(S,userMessage,targets[0].speaker,context,plan));
   if(turn!==remoteTurn||!S.settings.remoteAI)return;
   latency.mark('remote_first_response_at');latency.mark('remote_response_completed_at');
-  S=app.acceptRemoteReaction(target.id,result);const updated=S.messages.find(m=>m.id===target.id),batch=localMessages.map(m=>m.id===target.id?updated:m);hideTyping();render();latency.mark('assistant_text_rendered_at');speakMessages(batch,previous);
+  const next=app.acceptRemoteTurn(targets.map(m=>m.id),result.messages??[{text:result.text,emotion:result.emotion}]);
+  const byId=new Map(next.messages.map(m=>[m.id,m])),batch=localMessages.map(m=>byId.get(m.id)??m);
+  hideTyping();render();latency.mark('assistant_text_rendered_at');speakMessages(batch,previous);
  }catch{
-  const index=S.messages.findIndex(m=>m.id===target.id),lastUser=S.messages.map(m=>m.speaker).lastIndexOf('user');
+  const index=S.messages.findIndex(m=>m.id===targets[0].id),lastUser=S.messages.map(m=>m.speaker).lastIndexOf('user');
   if(turn===remoteTurn&&index>lastUser){hideTyping();toast('端末内の返答で続けます');latency.mark('assistant_text_rendered_at');speakMessages(localMessages,previous)}
  }finally{clearTimeout(stage);hideTyping();latency.flush()}
 }
