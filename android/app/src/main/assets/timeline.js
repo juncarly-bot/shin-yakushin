@@ -3,6 +3,7 @@ import {orchestrateConversation,depthContext} from './orchestrator.js';
 export function chatResolution(s,text,now){
  const r=resolveConversation(s,text,now),c=stateOf(s,now);
  r.depthContext=depthContext(s,text,now);
+ if(r.commitment)return r;
  const choose=(intent,lines)=>{r.intent=intent;r.reply=lines[(s.messages?.filter(m=>m.intent===intent&&m.speaker==='SAYO').length??0)%lines.length];r.action=null;r.route=null;return r};
  if(['discuss','followup'].includes(r.depthContext.recentUserIntent)){
   const topic=r.depthContext.topic;
