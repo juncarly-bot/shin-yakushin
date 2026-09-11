@@ -208,7 +208,7 @@ test('CI builds, verifies and uploads the migration QA APK separately',()=>{
  assert.match(workflow,/Download migration QA APK/);
  assert.match(workflow,/package:org\.shinyakushin\.study\.next\.v08\.migrationqa/);
  assert.match(workflow,/MigrationQa \| tee migration-qa-instrument\.txt/);
- assert.match(workflow,/MIGRATION_QA passed=7 failed=0/);
+ assert.match(workflow,/MIGRATION_QA passed=9 failed=0/);
 });
 
 test('the signed migration QA APK is verified against the pinned RC certificate',()=>{

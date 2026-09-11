@@ -42,6 +42,13 @@ public final class MigrationQa extends Instrumentation {
         return Files.createTempDirectory(getTargetContext().getCacheDir().toPath(), "migration-qa").toFile();
     }
 
+    /** Sorted directory listing so a test can prove no sibling was created or removed. */
+    private static java.util.TreeSet<String> siblings(File dir) {
+        String[] names = dir.list();
+        java.util.List<String> list = names == null ? java.util.Collections.emptyList() : Arrays.asList(names);
+        return new java.util.TreeSet<>(list);
+    }
+
     private static final String STATE = "{\"schemaVersion\":2,\"revision\":3,\"sessions\":[],\"materials\":[],\"goals\":[],"
             + "\"tasks\":[],\"plans\":[],\"memories\":[],\"visits\":[],\"progressEvents\":[],\"dialogueHistory\":{},\"reaction\":null,"
             + "\"settings\":{\"name\":\"\",\"utcOffsetMinutes\":540,\"breakMinutes\":5,\"quiet\":false,\"notifications\":false},"
@@ -115,15 +122,35 @@ public final class MigrationQa extends Instrumentation {
         });
         test("sqlite store payload is extracted from a private copy only", () -> {
             File dir = work();
+            File scratch = work();
             File source = sqliteStore(dir, STATE);
             byte[] raw = Files.readAllBytes(source.toPath());
-            MigrationSource.Result read = MigrationSource.read(source, dir);
+            java.util.TreeSet<String> before = siblings(dir);
+            MigrationSource.Result read = MigrationSource.read(source, scratch);
             check("sqlite3".equals(read.format), "unexpected format " + read.format);
             check(STATE.equals(read.json), "payload changed: " + read.json);
             check(Arrays.equals(raw, Files.readAllBytes(source.toPath())), "source bytes changed");
-            check(!new File(source.getPath() + "-wal").exists(), "wal sibling created next to the source");
-            check(!new File(source.getPath() + "-shm").exists(), "shm sibling created next to the source");
-            check(!new File(source.getPath() + "-journal").exists(), "journal sibling created next to the source");
+            check(siblings(dir).equals(before), "the reader changed the source directory: " + siblings(dir));
+            check(read.sha256.equals(MigrationSource.sha256(source)), "sha mismatch");
+        });
+        test("sqlite scratch copies are removed even when the directory is the source directory", () -> {
+            File dir = work();
+            File source = sqliteStore(dir, STATE);
+            java.util.TreeSet<String> before = siblings(dir);
+            MigrationSource.read(source, dir);
+            check(siblings(dir).equals(before), "scratch files were left behind: " + siblings(dir));
+        });
+        test("scratch files never survive a failed read", () -> {
+            File dir = work();
+            File scratch = work();
+            File source = new File(dir, "broken.sqlite3");
+            byte[] raw = new byte[4096];
+            System.arraycopy("SQLite format 3\u0000".getBytes(StandardCharsets.US_ASCII), 0, raw, 0, 16);
+            write(source, raw);
+            boolean rejected = false;
+            try { MigrationSource.read(source, scratch); } catch (IOException expected) { rejected = true; }
+            check(rejected, "corrupt image accepted");
+            check(siblings(scratch).isEmpty(), "scratch files were left behind: " + siblings(scratch));
         });
         test("app-data.tar is parsed and the archive is untouched", () -> {
             File dir = work();

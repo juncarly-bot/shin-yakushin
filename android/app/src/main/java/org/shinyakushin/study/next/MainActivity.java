@@ -126,9 +126,9 @@ public final class MainActivity extends Activity {
         // opened for writing, and the extracted JSON is preserved as an immutable import
         // source. Nothing is committed, so a failed rehearsal leaves both the picked file
         // and the currently installed app's state untouched.
-        else if(request==MIGRATION){File staged=new File(getCacheDir(),"migration-qa-input-"+System.currentTimeMillis()+".bin");try{
+        else if(request==MIGRATION){File scratch=new File(getCacheDir(),"migration-qa-scratch");scratch.mkdirs();File staged=new File(getCacheDir(),"migration-qa-input-"+System.currentTimeMillis()+".bin");try{
             try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(staged)){if(in==null)throw new IOException("ファイルを開けません");byte[] buffer=new byte[8192];int n;long total=0;while((n=in.read(buffer))!=-1){total+=n;if(total>MigrationSource.MAX_BYTES)throw new IOException("25 MB以下のファイルを選んでください");out.write(buffer,0,n);}}
-            MigrationSource.Result source=MigrationSource.read(staged,getCacheDir());store.preserveImport(source.json);
+            MigrationSource.Result source=MigrationSource.read(staged,scratch);store.preserveImport(source.json);
             final String payload=source.json;final String meta=new JSONObject().put("format",source.format).put("sha256",source.sha256).put("bytes",source.bytes).put("name",source.name).toString();
             runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformMigrationQaSource && window.platformMigrationQaSource("+JSONObject.quote(payload)+","+JSONObject.quote(meta)+")",null);});
         }finally{staged.delete();}}

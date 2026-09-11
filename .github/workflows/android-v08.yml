@@ -334,7 +334,7 @@ jobs:
           fi
           # The native read-only reader is exercised on the device by its own instrumentation.
           adb -s emulator-5554 shell am instrument -w org.shinyakushin.study.next.v07.preview.test/org.shinyakushin.study.next.MigrationQa | tee migration-qa-instrument.txt
-          grep -q "MIGRATION_QA passed=7 failed=0" migration-qa-instrument.txt
+          grep -q "MIGRATION_QA passed=9 failed=0" migration-qa-instrument.txt
           adb -s emulator-5554 shell run-as org.shinyakushin.study.next.v07.preview ls -la files | tee app-files-after-migration-qa.txt || true
 
       - name: Upload persistence evidence
