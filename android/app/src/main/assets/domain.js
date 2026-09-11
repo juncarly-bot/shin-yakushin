@@ -1,6 +1,7 @@
 import {compatibleLifeBalance} from './life-balance-compat.js';
 import {validateConversation} from './conversation-shape.js';
 import {voiceSettings} from './voice-settings.js';
+import {CommitmentStatus,COMMITMENT_KINDS,COMMITMENT_STATUSES,PROACTIVITY_LEVELS,DEFAULT_MINUTES,MAX_OPEN,isOpen,isMeaningful,matchesStudy} from './commitments.js';
 /** Android-independent domain. v0.1 segment and identity contracts retained. */
 export const VERSION=2;
 export const kinds=['materials','goals','tasks','plans'];
@@ -16,7 +17,7 @@ const uuid=()=>crypto.randomUUID();
 export const dateKey=(t,offset=540)=>new Date(t+offset*60000).toISOString().slice(0,10);
 export const dateMs=(d,offset=540)=>{if(typeof d!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(d))fail('日付が不正です');const t=Date.parse(d+'T00:00:00Z');if(!Number.isFinite(t)||new Date(t).toISOString().slice(0,10)!==d)fail('日付が不正です');return t-offset*60000};
 export const shiftDate=(d,n)=>dateKey(dateMs(d,0)+n*86400000,0);
-export const fresh=()=>({schemaVersion:VERSION,revision:0,sessions:[],materials:[],goals:[],tasks:[],plans:[],memories:[],visits:[],progressEvents:[],dialogueHistory:{},reaction:null,settings:{name:'',utcOffsetMinutes:540,breakMinutes:5,quiet:false,notifications:false,remoteAI:false,lifeBalance:{dailyMode:'NORMAL',budgetMinutes:{NORMAL:90,HOLIDAY:180,FOCUS:60},interventionLevel:'NORMAL',cooldownMinutes:120,usageInConversation:true,usageNotifications:true,appCategories:{}}},lastSeen:null});
+export const fresh=()=>({schemaVersion:VERSION,revision:0,sessions:[],materials:[],goals:[],tasks:[],plans:[],memories:[],visits:[],progressEvents:[],dialogueHistory:{},reaction:null,commitments:[],initiativeStats:{shown:0,accepted:0,declined:0,snoozed:0,completed:0},initiative:{lastPromptAt:0,lastKind:null,lastRelatedId:null,lastDeclinedAt:0,lastDeclinedKind:null,shownDay:null,shownCount:0,snoozeUntil:0},settings:{name:'',utcOffsetMinutes:540,breakMinutes:5,quiet:false,notifications:false,remoteAI:false,companion:{proactivity:'NORMAL',quietDay:null},lifeBalance:{dailyMode:'NORMAL',budgetMinutes:{NORMAL:90,HOLIDAY:180,FOCUS:60},interventionLevel:'NORMAL',cooldownMinutes:120,usageInConversation:true,usageNotifications:true,appCategories:{}}},lastSeen:null});
 export const active=s=>s.sessions.find(x=>x.endTimestamp===null);
 export const entity=(s,k,id)=>s[k].find(x=>x.id===id);
 export function totals(x,now){const r={study:0,break:0,pause:0};for(const p of x.segments)r[p.kind]+=Math.max(0,(p.end??now)-p.start)/1000;return r}
@@ -48,15 +49,18 @@ export function validate(s,allowedVersion=VERSION){
  const visits=new Set();for(const d of s.visits){dateMs(d);if(visits.has(d))fail('訪問日が重複しています');visits.add(d)}
  const progressIds=new Set();for(const e of s.progressEvents){str(e.id,100);if(progressIds.has(e.id))fail('進捗履歴が重複しています');progressIds.add(e.id);if(!['materials','goals'].includes(e.kind)||!ids[e.kind].has(e.relatedId))fail('進捗履歴の関連先がありません');str(e.title,200);num(e.before);num(e.after);num(e.timestamp)}
  object(s.dialogueHistory);for(const [k,v] of Object.entries(s.dialogueHistory)){str(k,100);num(v.count);num(v.last)}if(s.lastSeen!==null)num(s.lastSeen);if(s.reaction!==null){for(const k of ['text','emotion','gesture','event','templateId'])str(s.reaction[k]);num(s.reaction.timestamp)}
- const cfg=object(s.settings);if(cfg.voice!==undefined)voiceSettings(cfg.voice);if(cfg.remoteAI!==undefined)bool(cfg.remoteAI);str(cfg.name,80);num(cfg.utcOffsetMinutes,-720,840);if(!Number.isInteger(cfg.utcOffsetMinutes))fail('時差が不正です');num(cfg.breakMinutes,1,180);bool(cfg.quiet);if(allowedVersion===2)bool(cfg.notifications);return s;
+ if(s.commitments!==undefined){arr(s.commitments);if(s.commitments.length>50)fail('約束が多すぎます');const cids=new Set();for(const c of s.commitments){object(c);const cid=str(c.commitmentId,100);if(!cid||cids.has(cid))fail('約束IDが不正です');cids.add(cid);if(!COMMITMENT_KINDS.includes(c.kind))fail('約束の種類が不正です');if(!COMMITMENT_STATUSES.includes(c.status))fail('約束の状態が不正です');num(c.createdAt);num(c.updatedAt);str(c.title,200);if(c.owner!==null&&c.owner!==undefined&&!['SAYO','NurseT'].includes(c.owner))fail('約束の担当が不正です');for(const key of ['dueAt','snoozedUntil','lastPromptAt','acceptedAt','completedAt','declinedAt'])if(c[key]!==null&&c[key]!==undefined)num(c[key]);if(c.promptCount!==undefined)num(c.promptCount);if(c.minutes!==undefined)num(c.minutes,1,600);checkRefs(c)}}
+ if(s.initiativeStats!==undefined){object(s.initiativeStats);for(const k of ['shown','accepted','declined','snoozed','completed'])if(s.initiativeStats[k]!==undefined)num(s.initiativeStats[k])}
+ if(s.initiative!==undefined){object(s.initiative);for(const k of ['lastPromptAt','lastDeclinedAt','snoozeUntil','shownCount','lastAcceptedAt'])if(s.initiative[k]!==null&&s.initiative[k]!==undefined)num(s.initiative[k]);for(const k of ['lastKind','lastDeclinedKind'])if(s.initiative[k]!==null&&s.initiative[k]!==undefined)str(s.initiative[k],60);if(s.initiative.shownDay!==null&&s.initiative.shownDay!==undefined)dateMs(s.initiative.shownDay)}
+ const cfg=object(s.settings);if(cfg.voice!==undefined)voiceSettings(cfg.voice);if(cfg.companion!==undefined){object(cfg.companion);if(!PROACTIVITY_LEVELS.includes(cfg.companion.proactivity))fail('積極性の設定が不正です');if(cfg.companion.quietDay!==null&&cfg.companion.quietDay!==undefined&&typeof cfg.companion.quietDay!=='string')fail('静かな日の設定が不正です')}if(cfg.remoteAI!==undefined)bool(cfg.remoteAI);str(cfg.name,80);num(cfg.utcOffsetMinutes,-720,840);if(!Number.isInteger(cfg.utcOffsetMinutes))fail('時差が不正です');num(cfg.breakMinutes,1,180);bool(cfg.quiet);if(allowedVersion===2)bool(cfg.notifications);return s;
 }
-export function migrate(input){const original=clone(input);if(original.schemaVersion===1){validate(original,1);original.schemaVersion=2;original.settings.notifications=false;for(const x of original.sessions)x.milestones??=[];}validate(original);original.settings.lifeBalance=original.settings.lifeBalance===undefined?clone(fresh().settings.lifeBalance):compatibleLifeBalance(original.settings.lifeBalance,{preserveMissing:!!original.settings.lifeBalance&&typeof original.settings.lifeBalance==='object'&&!Array.isArray(original.settings.lifeBalance)});return validate(original)}
+export function migrate(input){const original=clone(input);if(original.schemaVersion===1){validate(original,1);original.schemaVersion=2;original.settings.notifications=false;for(const x of original.sessions)x.milestones??=[];}original.commitments=Array.isArray(original.commitments)?original.commitments:[];original.initiativeStats=original.initiativeStats&&typeof original.initiativeStats==='object'&&!Array.isArray(original.initiativeStats)?original.initiativeStats:{shown:0,accepted:0,declined:0,snoozed:0,completed:0};original.initiative=original.initiative&&typeof original.initiative==='object'&&!Array.isArray(original.initiative)?original.initiative:{lastPromptAt:0,lastKind:null,lastRelatedId:null,lastDeclinedAt:0,lastDeclinedKind:null,shownDay:null,shownCount:0,snoozeUntil:0};if(original.settings&&typeof original.settings==='object'&&!Array.isArray(original.settings))original.settings.companion=original.settings.companion&&typeof original.settings.companion==='object'&&!Array.isArray(original.settings.companion)?original.settings.companion:{proactivity:'NORMAL',quietDay:null};validate(original);original.settings.lifeBalance=original.settings.lifeBalance===undefined?clone(fresh().settings.lifeBalance):compatibleLifeBalance(original.settings.lifeBalance,{preserveMissing:!!original.settings.lifeBalance&&typeof original.settings.lifeBalance==='object'&&!Array.isArray(original.settings.lifeBalance)});return validate(original)}
 export function apply(state,action,p={},now=Date.now()){
  const s=clone(state);let event=null,context={};const a=active(s);
  switch(action){
  case 'visit':{const d=dateKey(now,s.settings.utcOffsetMinutes),gap=s.lastSeen===null?0:Math.floor((now-s.lastSeen)/86400000);if(!s.visits.includes(d)){s.visits.push(d);event=gap>=7?'return':'hello';context.days=gap}s.lastSeen=now;break}
  case 'start':{const sid=str(p.sessionId,100);if(!sid)fail('sessionIdが必要です');if(s.sessions.some(x=>x.sessionId===sid))return {state:s,event:null,context:{}};if(a)fail('現在の学習を続けてください');const r=relations(s,p);s.sessions.push({sessionId:sid,startTimestamp:now,endTimestamp:null,sourceType:r.relatedPlanId?'plan':Object.values(r).some(Boolean)?'linked':'free',title:str(p.title??'自由学習',200)||'自由学習',note:'',segments:[{kind:'study',start:now,end:null}],breakUntil:null,milestones:[],...r});event='start';break}
- case 'pause':case 'resume':case 'break':case 'finish':{const x=s.sessions.find(x=>x.sessionId===p.sessionId);if(!x)fail('学習が見つかりません');if(x.endTimestamp!==null)return {state:s,event:null,context:{}};const prev=x.segments.at(-1);now=Math.max(now,prev.start);if(action==='finish'){prev.end=now;x.endTimestamp=now;x.breakUntil=null;x.note=str(p.note??x.note);context={minutes:Math.floor(totals(x,now).study/60),material:x.relatedMaterialId};event='finish';if(s.sessions.length===1)remember(s,'first','はじめて学習を記録した日。',now,x.sessionId,4);if(totals(x,now).study>=3600)remember(s,'long','1時間以上、一緒に取り組んだ日。',now,x.sessionId,3);const m=metrics(s,now);if([3,7,30,100,180,365].includes(m.studyDays))remember(s,'consistency',`${m.studyDays}日、学習を積み重ねた。`,now,String(m.studyDays),4);
+ case 'pause':case 'resume':case 'break':case 'finish':{const x=s.sessions.find(x=>x.sessionId===p.sessionId);if(!x)fail('学習が見つかりません');if(x.endTimestamp!==null)return {state:s,event:null,context:{}};const prev=x.segments.at(-1);now=Math.max(now,prev.start);if(action==='finish'){prev.end=now;x.endTimestamp=now;x.breakUntil=null;x.note=str(p.note??x.note);context={minutes:Math.floor(totals(x,now).study/60),material:x.relatedMaterialId};event='finish';for(const c of s.commitments??[])if(isOpen(c)&&matchesStudy(c,x)&&isMeaningful(c,x,now)){c.status=CommitmentStatus.COMPLETED;c.completedAt=now;c.updatedAt=now;context.completedCommitmentId=c.commitmentId;event='commitment-complete'}if(s.sessions.length===1)remember(s,'first','はじめて学習を記録した日。',now,x.sessionId,4);if(totals(x,now).study>=3600)remember(s,'long','1時間以上、一緒に取り組んだ日。',now,x.sessionId,3);const m=metrics(s,now);if([3,7,30,100,180,365].includes(m.studyDays))remember(s,'consistency',`${m.studyDays}日、学習を積み重ねた。`,now,String(m.studyDays),4);
   }else{const k={pause:'pause',resume:'study',break:'break'}[action];if(prev.kind===k)return {state:s,event:null,context:{}};prev.end=now;x.segments.push({kind:k,start:now,end:null});x.breakUntil=k==='break'?now+num(p.minutes??s.settings.breakMinutes,1,180)*60000:null;event=action}break}
  case 'classify':{const x=s.sessions.find(x=>x.sessionId===p.sessionId);if(!x)fail('学習が見つかりません');Object.assign(x,relations(s,p));x.note=str(p.note??x.note);if(p.title!==undefined)x.title=str(p.title,200)||'自由学習';break}
  case 'saveEntity':{const k=p.kind;if(!kinds.includes(k))fail('種類が不正です');const title=str(p.title??'',200);if(!title)fail('名前を入力してください');let o=entity(s,k,p.id),old=o?clone(o):null;if(p.id&&!o)fail('編集対象が見つかりません');if(!o){o={id:uuid(),createdAt:now,completedAt:null,progress:0};s[k].push(o)}Object.assign(o,{title,memo:str(p.memo??''),archived:!!p.archived});
@@ -67,6 +71,50 @@ export function apply(state,action,p={},now=Date.now()){
  case 'intervention':{const lb=s.settings.lifeBalance||{},id=str(p.interventionId,120);if(!id)fail('介入IDが必要です');if(lb.lastInterventionId===id)return {state:s,event:null,context:{}};const text=str(p.text,300);if(!text)fail('介入メッセージがありません');const who=p.speaker==='NurseT'?'NurseT':'SAYO';s.reaction={text,templateId:'intervention:'+str(p.reason,40),event:'intervention',emotion:who==='NurseT'?'concerned':'pleased',gesture:'None',timestamp:now,speaker:who};s.settings.lifeBalance={...lb,lastInterventionId:id,lastInterventionAt:now,lastInterventionDay:dateKey(now,s.settings.utcOffsetMinutes),lastInterventionReason:str(p.reason,40)};event='intervention';context={reason:p.reason,interventionId:id,text};break}
  case 'interact':event='interact';break;
  case 'review':event=p.weekly?'weeklyReview':'dailyReview';break;
+ case 'commitment':{
+      if(!COMMITMENT_KINDS.includes(p.kind))fail('約束の種類が不正です');
+      const title=str(p.title??'',200)||'続き';
+      const minutes=Number.isFinite(Number(p.minutes))?Math.max(1,Math.min(600,Number(p.minutes))):DEFAULT_MINUTES;
+      const related=relations(s,p),existing=p.commitmentId?s.commitments.find(c=>c.commitmentId===p.commitmentId):null;
+      if(p.commitmentId&&!existing)fail('約束が見つかりません');
+      if(!existing&&s.commitments.filter(isOpen).length>=MAX_OPEN)fail('約束が多すぎます');
+      const record={...(existing??{commitmentId:crypto.randomUUID(),createdAt:now,promptCount:0,acceptedAt:null,completedAt:null,declinedAt:null,lastPromptAt:null,snoozedUntil:null}),kind:p.kind,title,owner:p.owner==='NurseT'?'NurseT':'SAYO',source:str(p.source??'conversation',40),minutes,dueAt:Number.isFinite(Number(p.dueAt))?Number(p.dueAt):null,status:CommitmentStatus.PENDING,updatedAt:now,...related};
+      if(existing)Object.assign(existing,record);else s.commitments.push(record);
+      event='commitment';context={commitmentId:record.commitmentId,title};break;
+    }
+ case 'commitmentAction':{
+      const c=s.commitments.find(x=>x.commitmentId===p.commitmentId);if(!c)fail('約束が見つかりません');
+      if(p.op==='snooze'){c.status=CommitmentStatus.SNOOZED;c.snoozedUntil=Number.isFinite(Number(p.until))?Number(p.until):now+Math.max(1,Math.min(720,Number(p.minutes)||30))*60000;if(c.snoozedUntil<=now)c.snoozedUntil=now+30*60000}
+      else if(p.op==='decline'){c.status=CommitmentStatus.DECLINED;c.declinedAt=now}
+      else if(p.op==='complete'){c.status=CommitmentStatus.COMPLETED;c.completedAt=now}
+      else if(p.op==='cancel'){c.status=CommitmentStatus.CANCELLED}
+      else if(p.op==='prompt'){c.lastPromptAt=now;c.promptCount=(c.promptCount??0)+1}
+      else if(p.op==='expire'){c.status=CommitmentStatus.EXPIRED}
+      else fail('約束の操作が不正です');
+      c.updatedAt=now;event='commitmentAction';context={commitmentId:c.commitmentId,op:p.op};break;
+    }
+ case 'commitmentMaintenance':{
+      for(const c of s.commitments){if(c.status===CommitmentStatus.PENDING&&c.dueAt!==null&&c.dueAt!==undefined&&now-c.dueAt>36*3600000){c.status=CommitmentStatus.EXPIRED;c.updatedAt=now}if(c.status===CommitmentStatus.SNOOZED&&c.snoozedUntil!==null&&c.snoozedUntil!==undefined&&now-c.snoozedUntil>12*3600000){c.status=CommitmentStatus.EXPIRED;c.updatedAt=now}}break;
+    }
+ case 'initiative':{
+      s.initiativeStats??={shown:0,accepted:0,declined:0,snoozed:0,completed:0};
+      s.initiative??={lastPromptAt:0,lastKind:null,lastRelatedId:null,lastDeclinedAt:0,lastDeclinedKind:null,shownDay:null,shownCount:0,snoozeUntil:0};
+      const today=dateKey(now,s.settings.utcOffsetMinutes);
+      if(p.event==='shown'){s.initiative.snoozeUntil=0;if(s.initiative.shownDay!==today){s.initiative.shownDay=today;s.initiative.shownCount=0}s.initiative.shownCount=(s.initiative.shownCount??0)+1;s.initiative.lastPromptAt=now;s.initiative.lastKind=str(p.kind??'',60)||null;s.initiative.lastRelatedId=p.relatedId?String(p.relatedId).slice(0,100):null;s.initiativeStats.shown=(s.initiativeStats.shown??0)+1}
+      else if(p.event==='accepted'){s.initiativeStats.accepted=(s.initiativeStats.accepted??0)+1;s.initiative.lastAcceptedAt=now}
+      else if(p.event==='declined'){s.initiativeStats.declined=(s.initiativeStats.declined??0)+1;s.initiative.lastDeclinedAt=now;s.initiative.lastDeclinedKind=str(p.kind??s.initiative.lastKind??'',60)||null;s.initiative.snoozeUntil=0;if(p.quietToday)s.settings.companion={proactivity:PROACTIVITY_LEVELS.includes(s.settings.companion?.proactivity)?s.settings.companion.proactivity:'NORMAL',quietDay:today}}
+      else if(p.event==='snoozed'){s.initiativeStats.snoozed=(s.initiativeStats.snoozed??0)+1;s.initiative.snoozeUntil=now+Math.max(1,Math.min(720,Number(p.minutes)||30))*60000;s.initiative.lastPromptAt=now}
+      else if(p.event==='completed'){s.initiativeStats.completed=(s.initiativeStats.completed??0)+1}
+      else fail('initiativeの操作が不正です');
+      break;
+    }
+ case 'companion':{
+      const current=s.settings.companion??{proactivity:'NORMAL',quietDay:null};
+      if(p.proactivity!==undefined){if(!PROACTIVITY_LEVELS.includes(p.proactivity))fail('積極性の設定が不正です');current.proactivity=p.proactivity}
+      if(p.quietDay!==undefined)current.quietDay=p.quietDay;
+      s.settings.companion={proactivity:current.proactivity??'NORMAL',quietDay:current.quietDay??null};
+      break;
+    }
  default:fail('不明な操作です');
  }
  validate(s);return {state:s,event,context};
