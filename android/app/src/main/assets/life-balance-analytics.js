@@ -24,16 +24,20 @@ export function normalizeLedger(raw){
  const result={version:1,days:[],rejectedCount:0};
  if(raw===undefined)return result;
  if(!raw||raw.version!==1||!Array.isArray(raw.days))return {...result,rejectedCount:1};
- for(const item of raw.days){try{const next=upsertDaily(result,item);result.days=next.days}catch{result.rejectedCount++}}
+ for(const item of raw.days){try{const next=replaceValidated(result,dailyAggregate(item));result.days=next.days}catch{result.rejectedCount++}}
  return result;
 }
 /** Replace cumulative observations; never add snapshots. Overlapping other dates are rejected. */
 export function upsertDaily(ledger,input){
- const day=dailyAggregate(input),days=(ledger?.days||[]).map(d=>dailyAggregate(d));
+ const days=(ledger?.days||[]).map(d=>dailyAggregate(d));return replaceValidated({...ledger,days},dailyAggregate(input));
+}
+function replaceValidated(ledger,day){
+ const days=ledger.days;
  const prior=days.find(d=>d.date===day.date);
  if(prior&&(prior.timeZone!==day.timeZone||prior.startMs!==day.startMs))throw Error('Timezone changed: ambiguous day requires explicit reconciliation');
  if(prior&&day.observedAt<prior.observedAt)throw Error('Stale observation');
  if(prior&&day.endMs<prior.endMs)throw Error('Clock rollback');
+ if(prior?.complete&&!day.complete)throw Error('Cannot downgrade finalized day');
  if(days.some(d=>d.date!==day.date&&d.startMs<day.endMs&&day.startMs<d.endMs))throw Error('Overlapping daily windows');
  return {version:1,days:[...days.filter(d=>d.date!==day.date),day].sort((a,b)=>a.date.localeCompare(b.date)),rejectedCount:ledger?.rejectedCount||0};
 }

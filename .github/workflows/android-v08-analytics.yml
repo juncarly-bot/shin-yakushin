@@ -105,6 +105,18 @@ jobs:
           python3 tools/verify_voice_bundle.py
           sha256sum -c SHA256SUMS-VOICEVOX-v07.txt
 
+      - name: Android source secret scan
+        run: |
+          python3 - <<'SCAN'
+          from pathlib import Path
+          import re
+          patterns = [rb'sk-[A-Za-z0-9_-]{20,}', rb'OPENAI_API_KEY', rb'api\.openai\.com']
+          for path in Path('app/src/main').rglob('*'):
+              if path.is_file() and path.suffix in ('.java', '.js', '.json', '.xml', '.html'):
+                  assert not any(re.search(p, path.read_bytes()) for p in patterns), str(path)
+          print('Android source secret scan: NONE')
+          SCAN
+
       - name: Clean
         run: ./gradlew --no-daemon clean
 
