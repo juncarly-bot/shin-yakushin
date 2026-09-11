@@ -4,6 +4,7 @@ const java=p=>fs.readFileSync(new URL('../app/src/main/java/org/shinyakushin/stu
 const notifier=java('LifeBalanceNotifier.java');
 const copy=java('InterventionCopy.java');
 const worker=java('LifeBalanceWorker.java');
+const check=java('LifeBalanceCheck.java');
 const main=java('MainActivity.java');
 const manifest=fs.readFileSync(new URL('../app/src/main/AndroidManifest.xml',import.meta.url),'utf8');
 
@@ -18,7 +19,7 @@ test('POST_NOTIFICATIONS denial disables only the notification',()=>{
  assert.ok(notifier.includes('BreakReceiver.permitted(c)'),'runtime permission must gate posting');
  assert.ok(notifier.includes('areNotificationsEnabled()'),'app toggle must gate posting');
  assert.ok(!/Result\.failure|startForeground/.test(notifier));
- assert.ok(worker.includes('notified="+notified'),'worker logs whether a notification was posted');
+ assert.ok(check.includes('notified="+notified'),'the check logs whether a notification was posted');
 });
 
 test('copy is privacy-safe and identical across Java and JavaScript',()=>{
@@ -50,6 +51,7 @@ test('duplicate and cooldown state persists across restart through SharedPrefere
 test('notification opt-out and non-actionable decisions stay silent',()=>{
  assert.ok(notifier.includes('optBoolean("usageNotifications",true)'));
  assert.ok(notifier.includes('decision.actionable()'));
- const workerGate=worker.indexOf('LifeBalanceNotifier.maybeNotify');
- assert.ok(workerGate>0,'worker must route the decision through the notifier');
+ const gate=check.indexOf('LifeBalanceNotifier.maybeNotify');
+ assert.ok(gate>0,'the check must route the decision through the notifier');
+ assert.ok(worker.includes('LifeBalanceCheck.run('),'the worker must delegate to the shared check');
 });

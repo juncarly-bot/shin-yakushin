@@ -2,7 +2,7 @@ name: Android v0.8 life balance build
 
 on:
   push:
-    branches: [android-v08-life-balance]
+    branches: [android-v08-life-balance, android-v08-integration]
   workflow_dispatch:
 
 permissions:

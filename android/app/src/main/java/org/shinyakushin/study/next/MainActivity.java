@@ -37,7 +37,7 @@ public final class MainActivity extends Activity {
             @Override public boolean shouldOverrideUrlLoading(WebView w,WebResourceRequest r){return true;}
             @Override public void onPageFinished(WebView w,String url){webReady=true;String queued=pendingIntervention;pendingIntervention=null;if(queued!=null)dispatchIntervention(queued);}
             @Override public WebResourceResponse shouldInterceptRequest(WebView w,WebResourceRequest req){
-                Uri u=req.getUrl();String path=u.getPath();Set<String> allowed=new HashSet<>(Arrays.asList("/index.html","/ui.js","/domain.js","/reactions.js","/templates.js","/platform.js","/style.css","/avatar-sheet.png","/timeline.js","/orchestrator.js","/conversation.js","/conversation-shape.js","/characters.js","/companion.js","/voice-settings.js","/remote-ai.js","/life-balance.js"));
+                Uri u=req.getUrl();String path=u.getPath();Set<String> allowed=new HashSet<>(Arrays.asList("/index.html","/ui.js","/domain.js","/reactions.js","/templates.js","/platform.js","/style.css","/avatar-sheet.png","/timeline.js","/orchestrator.js","/conversation.js","/conversation-shape.js","/characters.js","/companion.js","/voice-settings.js","/remote-ai.js","/life-balance.js","/life-balance-analytics.js","/life-balance-compat.js"));
                 if(!"https".equals(u.getScheme())||!"appassets.androidplatform.net".equals(u.getHost())||!allowed.contains(path))return response("text/plain",404,"Not found",new ByteArrayInputStream(new byte[0]));
                 try{return response(path.endsWith(".js")?"text/javascript":path.endsWith(".css")?"text/css":path.endsWith(".png")?"image/png":"text/html",200,"OK",getAssets().open(path.substring(1)));}catch(IOException ex){return response("text/plain",404,"Not found",new ByteArrayInputStream(new byte[0]));}
             }
@@ -77,6 +77,22 @@ public final class MainActivity extends Activity {
             final String value=summary;
             runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformDailyBalance && window.platformDailyBalance("+JSONObject.quote(value)+")",null);});
         });}
+        @JavascriptInterface public void requestDailyHistory(){io.execute(()->{
+            String history;
+            try{history=new JSONObject().put("ok",true).put("days",LifeBalanceHistory.read(MainActivity.this,store.read(),System.currentTimeMillis())).toString();}
+            catch(Exception ex){history="{\"ok\":false,\"days\":[]}";}
+            final String value=history;
+            runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformDailyHistory && window.platformDailyHistory("+JSONObject.quote(value)+")",null);});
+        });}
+        /** Debug builds only: the release APK reports false, so no QA trigger is exposed. */
+        @JavascriptInterface public boolean debugToolsEnabled(){
+            return (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0;
+        }
+        /** Debug builds only: run the same read-only check the periodic worker runs. */
+        @JavascriptInterface public String runLifeBalanceNow(){
+            try{return LifeBalanceCheck.run(this,System.currentTimeMillis()).toString();}
+            catch(Throwable failure){return "{\"checked\":false,\"reason\":\"error\"}";}
+        }
         @JavascriptInterface public void requestLaunchableApps(){io.execute(()->{
             String catalog=LaunchableApps.read(MainActivity.this);
             runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformLaunchableApps && window.platformLaunchableApps("+JSONObject.quote(catalog)+")",null);});

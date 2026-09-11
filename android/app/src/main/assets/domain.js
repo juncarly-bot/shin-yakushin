@@ -1,3 +1,4 @@
+import {compatibleLifeBalance} from './life-balance-compat.js';
 import {validateConversation} from './conversation-shape.js';
 import {voiceSettings} from './voice-settings.js';
 /** Android-independent domain. v0.1 segment and identity contracts retained. */
@@ -49,7 +50,7 @@ export function validate(s,allowedVersion=VERSION){
  object(s.dialogueHistory);for(const [k,v] of Object.entries(s.dialogueHistory)){str(k,100);num(v.count);num(v.last)}if(s.lastSeen!==null)num(s.lastSeen);if(s.reaction!==null){for(const k of ['text','emotion','gesture','event','templateId'])str(s.reaction[k]);num(s.reaction.timestamp)}
  const cfg=object(s.settings);if(cfg.voice!==undefined)voiceSettings(cfg.voice);if(cfg.remoteAI!==undefined)bool(cfg.remoteAI);str(cfg.name,80);num(cfg.utcOffsetMinutes,-720,840);if(!Number.isInteger(cfg.utcOffsetMinutes))fail('時差が不正です');num(cfg.breakMinutes,1,180);bool(cfg.quiet);if(allowedVersion===2)bool(cfg.notifications);return s;
 }
-export function migrate(input){const original=clone(input);if(original.schemaVersion===1){validate(original,1);original.schemaVersion=2;original.settings.notifications=false;for(const x of original.sessions)x.milestones??=[];}validate(original);if(original.settings.lifeBalance===undefined)original.settings.lifeBalance=clone(fresh().settings.lifeBalance);return validate(original)}
+export function migrate(input){const original=clone(input);if(original.schemaVersion===1){validate(original,1);original.schemaVersion=2;original.settings.notifications=false;for(const x of original.sessions)x.milestones??=[];}validate(original);original.settings.lifeBalance=original.settings.lifeBalance===undefined?clone(fresh().settings.lifeBalance):compatibleLifeBalance(original.settings.lifeBalance,{preserveMissing:!!original.settings.lifeBalance&&typeof original.settings.lifeBalance==='object'&&!Array.isArray(original.settings.lifeBalance)});return validate(original)}
 export function apply(state,action,p={},now=Date.now()){
  const s=clone(state);let event=null,context={};const a=active(s);
  switch(action){

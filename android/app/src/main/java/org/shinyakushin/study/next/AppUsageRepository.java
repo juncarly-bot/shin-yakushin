@@ -67,12 +67,15 @@ public final class AppUsageRepository {
     }
     /** Missing events cannot be recovered exactly; never replace them with expanded daily buckets. */
     public Map<String, Long> todayDurations(long now) {
+        return durations(UsageIntervals.dayStart(now, java.time.ZoneId.systemDefault()), now);
+    }
+    /** Bounded [start,end) query used for both the live day and finalized past days. */
+    public Map<String, Long> durations(long start, long end) {
         if (!hasUsageAccess() || usage == null) return Collections.emptyMap();
-        long start = UsageIntervals.dayStart(now, java.time.ZoneId.systemDefault());
-        UsageIntervals intervals = new UsageIntervals(start, now);
+        UsageIntervals intervals = new UsageIntervals(start, end);
         try {
             // Bounded lookback establishes a foreground session spanning local midnight.
-            UsageEvents events = usage.queryEvents(Math.max(0, start - 86400000L), now);
+            UsageEvents events = usage.queryEvents(Math.max(0, start - 86400000L), end);
             if (events == null) return Collections.emptyMap();
             UsageEvents.Event event = new UsageEvents.Event();
             while (events.hasNextEvent()) {
