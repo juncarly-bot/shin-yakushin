@@ -6,7 +6,7 @@ test('usage access bridge is optional and opens Android settings',()=>{assert.ok
 const ui=fs.readFileSync(new URL('../app/src/main/assets/ui.js',import.meta.url),'utf8');
 for(const granted of [true,false])test(`permission settings renders actual bridge state: ${granted}`,()=>{
  const source=ui.split('\n').find(line=>line.startsWith('function settings()'));
- const html=vm.runInNewContext(source+';settings()', {S:{settings:{}},host:{usageAccessAllowed:()=>granted,notificationAllowed:()=>false},remoteAI:null,E:String,voiceForm:()=>''});
+ const html=vm.runInNewContext(source+';settings()', {S:{settings:{}},host:{usageAccessAllowed:()=>granted,notificationAllowed:()=>false},remoteAI:null,E:String,voiceForm:()=>'',today:()=>'2026-09-11'});
  assert.ok(html.includes(`使用状況へのアクセス: ${granted?'許可済み':'未許可'}`));
  assert.ok(html.includes('data-action="usageAccess"'));
  assert.ok(html.includes('未許可でも学習と会話は通常どおり使えます'));

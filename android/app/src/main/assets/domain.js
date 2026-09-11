@@ -84,9 +84,10 @@ export function apply(state,action,p={},now=Date.now()){
       s.initiative.shownCount=(s.initiative.shownCount??0)+1;
       s.initiative.lastPromptAt=now;
       s.initiative.lastKind=str(p.kind??'',60)||null;
-      s.initiative.lastRelatedId=p.relatedId?String(p.relatedId).slice(0,100):null;
+      s.initiative.lastRelatedId=p.commitmentId?String(p.commitmentId).slice(0,100):(p.relatedId?String(p.relatedId).slice(0,100):null);
       s.initiative.snoozeUntil=0;
       s.initiativeStats.shown=(s.initiativeStats.shown??0)+1;
+      if(p.commitmentId){const promised=(s.commitments??[]).find(c=>c.commitmentId===p.commitmentId);if(promised){promised.lastPromptAt=now;promised.promptCount=(promised.promptCount??0)+1;promised.updatedAt=now;if(promised.status===CommitmentStatus.SNOOZED){promised.status=CommitmentStatus.PENDING;promised.snoozedUntil=null}}}
       s.initiative.activeProposal={id:str(p.id??'proposal',200),kind:str(p.kind??'',60),createdAt:now,title:str(p.title??'',200),commitmentId:p.commitmentId?String(p.commitmentId).slice(0,100):null,relatedMaterialId:p.relatedMaterialId??null,relatedTaskId:p.relatedTaskId??null,relatedGoalId:p.relatedGoalId??null,relatedPlanId:p.relatedPlanId??null,actionOptions:[]};
       s.initiative.activeProposal.actionOptions=(Array.isArray(p.actionOptions)?p.actionOptions:[]).slice(0,4).map(option=>({id:str(option?.id??'',60),label:str(option?.label??'',60),kind:str(option?.kind??'',40),minutes:Number.isFinite(Number(option?.minutes))?Math.max(1,Math.min(600,Number(option.minutes))):null,quietToday:Boolean(option?.quietToday),relatedMaterialId:option?.relatedMaterialId??null,relatedTaskId:option?.relatedTaskId??null,relatedGoalId:option?.relatedGoalId??null,relatedPlanId:option?.relatedPlanId??null}));
       event='initiative';context={kind:p.kind,proposalId:s.initiative.activeProposal.id};break;

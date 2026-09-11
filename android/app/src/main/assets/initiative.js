@@ -23,6 +23,8 @@ export const ActionKind=Object.freeze({START_STUDY:'START_STUDY',SNOOZE:'SNOOZE'
 const HOUR=3600000,MINUTE=60000,DAY=86400000;
 const CAPS={LOW:{perDay:2,cooldown:4*HOUR,decline:12*HOUR},NORMAL:{perDay:4,cooldown:90*MINUTE,decline:12*HOUR},HIGH:{perDay:6,cooldown:30*MINUTE,decline:6*HOUR}};
 const DEDUPE_WINDOW=6*HOUR;
+/** After a promise is surfaced, wait before the same promise appears again. */
+const REPROMPT_GAP=30*MINUTE;
 
 const proposal=(fields)=>({id:fields.id,kind:fields.kind,createdAt:fields.createdAt,speakerPlan:fields.speakerPlan??['SAYO'],reason:fields.reason,title:fields.title,
  messageHint:fields.messageHint??null,messages:fields.messages??[],actionOptions:fields.actionOptions??[],
@@ -35,7 +37,10 @@ export function proactivityOf(s){const level=s.settings?.companion?.proactivity;
 export function dueCommitment(s,now){
  const open=(s.commitments??[]).filter(isOpen).filter(c=>{
   const due=c.status===CommitmentStatus.SNOOZED?(c.snoozedUntil??Infinity):(c.dueAt??Infinity);
-  return due<=now&&now-due<36*HOUR;
+  if(!(due<=now&&now-due<36*HOUR))return false;
+  if((c.promptCount??0)>=2)return false;
+  if((c.lastPromptAt??0)>0&&now-(c.lastPromptAt??0)<REPROMPT_GAP&&!(c.status===CommitmentStatus.SNOOZED&&now>=(c.snoozedUntil??0)))return false;
+  return true;
  });
  open.sort((a,b)=>((a.snoozedUntil??a.dueAt)??0)-((b.snoozedUntil??b.dueAt)??0));
  return open[0]??null;
