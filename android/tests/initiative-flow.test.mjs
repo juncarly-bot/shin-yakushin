@@ -80,6 +80,16 @@ test('the finish screen offers one more or stop, wired to real commands',()=>{
  assert.match(ui,/else if\(a==='finish'\)\{if\(command\('finish'[\s\S]*?finishProposal=followUp\(S,now\(\)\)/);
 });
 
+test('a stale proposal stops rendering and can be cleared',()=>{
+ const {app,setClock}=setup();const {t}=previousStudy(app);const at=t+DAY;setClock(at);
+ const p=evaluate(app.state,at),shown=app.command('initiativeShow',p,true);
+ assert.equal(shown.initiative.activeProposal.expiresAt,p.expiresAt);
+ assert.equal(app.command('initiative',{event:'cleared'}).initiative.activeProposal,null);
+ assert.match(ui,/function liveProposal\(\)/);
+ assert.match(ui,/initiativeChips\(liveProposal\(\),'active'\)/);
+ assert.match(ui,/command\('initiative',\{event:'cleared'\}\)/);
+});
+
 test('the UI only ever renders proposals that pass local validation',()=>{
  assert.match(ui,/if\(!proposal\|\|!validateProposal\(proposal\)\)return false;/);
  assert.match(ui,/command\('initiativeShow',proposal,true\)/);

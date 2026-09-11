@@ -27,7 +27,7 @@ test('typing indicator reflects real pending state and is always cleared',()=>{
 });
 
 test('the indicator is rendered inside the conversation, not as a floating delay',()=>{
- assert.match(ui,/typingHtml\(\)\+initiativeChips\([^)]*\)\+'<div id="messages-end">/);
+ assert.match(ui,/typingHtml\(\)\+initiativeChips\(liveProposal\(\),'active'\)\+'<div id="messages-end">/);
  assert.match(css,/\.typing-dots/);
  assert.match(css,/typing-pulse/);
 });
