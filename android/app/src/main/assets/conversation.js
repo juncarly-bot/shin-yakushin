@@ -1,3 +1,4 @@
+import {isWeeklyQuestion,weeklyContext,weeklyReply,weekStart} from './life-balance-analytics.js';
 import {active,entity,dateKey} from './domain.js';
 const DAY=86400000;
 const fieldFor={materials:'relatedMaterialId',tasks:'relatedTaskId',goals:'relatedGoalId',plans:'relatedPlanId'};
@@ -15,6 +16,7 @@ const continuationRequest=text=>/^(昨日の)?(続き|つづき)(を|から)?(�
 
 export function resolveConversation(s,input,now,selection=null){const text=input.trim();if(!text||text.length>300)throw Error('ひとことは1〜300文字で入力してください');const c=stateOf(s,now),a=active(s),result={intent:'clarify',text,topic:null,action:null,payload:{},route:null,reply:'教材名や「続きやる」「休憩する」「振り返り」などで伝えてね。',choices:[],quickActions:[]};
  if(continuationRequest(text)){result.intent='continue';if(a){result.action=a.segments.at(-1).kind==='study'?null:'resume';result.payload={sessionId:a.sessionId};result.route='focus';result.reply='今取り組んでいる学習に戻ろう。';return result}const candidates=continuationCandidates(s,now,text),first=candidates[0],second=candidates[1];if(first&&(!second||first.score-second.score>=15||first.reason==='conversation')){result.topic=first;result.action='start';result.payload=startPayload(first);result.route='focus';result.reply=`${first.item.title}の続きですね。一緒に進めよう。`;return result}if(first){result.choices=candidates.slice(0,3);result.reply=`${result.choices.map(x=>x.item.title).join('と')}、どの続きにします？`;return result}result.reply='続けたい教材を「学ぶこと」で選んでね。予定なしでも始められるよ。';result.quickActions=['materials','free'];return result}
+ if(isWeeklyQuestion(text)){result.intent='review';result.reply=weeklyReply(weeklyContext(s.lifeBalanceAnalytics,weekStart(now,text.startsWith('先週')),{enabled:true,relevant:true}));return result}
  if(/^(休憩|ひと休み)(する|しよう)?[。！!]*$/.test(text)){result.intent='break';result.route=a?'break':null;result.reply=a?'休憩の長さを選びましょう。':'今は学習中ではありません。ひと息ついてくださいね。';result.quickActions=a?['break5','break10','continue']:[];return result}
  if(/^(振り返り|振り返る|今日の記録|今週の記録)[。！!]*$/.test(text)){result.intent='review';result.action='review';result.payload={weekly:text.includes('今週')};result.route='records';result.reply='積み重ねた記録を、一緒に見てみましょう。';return result}
  if(/^(進捗|進捗更新|どこまで)[。！!]*$/.test(text)){result.intent='progress';const previous=continuation(s,now),m=entity(s,'materials',a?.relatedMaterialId||c.materialId||(previous?.kind==='materials'?previous.item.id:previous?.item.relatedMaterialId));result.route=m?'progress':null;result.materialId=m?.id;result.reply=m?`${m.title}、今日はどこまで進みましたか？`:'進捗を残す教材を「学ぶこと」から選んでね。';return result}

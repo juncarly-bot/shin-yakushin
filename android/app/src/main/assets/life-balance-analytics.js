@@ -9,7 +9,8 @@ export function dailyAggregate(input){
  localDay(0,input.timeZone);
  const {startMs,endMs,observedAt}=input;
  if(!finite(startMs,9e15)||!finite(endMs,9e15)||!finite(observedAt,9e15)||endMs<=startMs||endMs-startMs>27*3600000||observedAt<endMs||localDay(startMs,input.timeZone)!==input.date||localDay(endMs-1,input.timeZone)!==input.date)throw Error('Invalid aggregate window');
- const out={date:input.date,timeZone:input.timeZone,startMs,endMs,observedAt,complete:input.complete===true,mode:modes.includes(input.mode)?input.mode:'NORMAL'};
+ if(input.complete===true&&(localDay(startMs-1,input.timeZone)===input.date||localDay(endMs,input.timeZone)===input.date))throw Error('Incomplete day marked complete');
+ const out={categoryCoverage:input.categoryCoverage!==false,date:input.date,timeZone:input.timeZone,startMs,endMs,observedAt,complete:input.complete===true,mode:modes.includes(input.mode)?input.mode:'NORMAL'};
  for(const key of ['studyMinutes','goalMinutes','entertainmentMinutes','studyAppMinutes','neutralMinutes','interventionCount','recoveryCount']){const v=input[key]??0;if(!finite(v,key.endsWith('Count')?10000:1620))throw Error('Invalid aggregate value');out[key]=v}
  if(out.studyMinutes>(endMs-startMs)/60000||out.entertainmentMinutes+out.studyAppMinutes+out.neutralMinutes>(endMs-startMs)/60000)throw Error('Aggregate exceeds window');
  out.budgetMinutes=out.mode==='UNLIMITED'?null:(finite(input.budgetMinutes,1440)?input.budgetMinutes:null);
@@ -39,7 +40,7 @@ export function upsertDaily(ledger,input){
 export function weeklySummary(ledger,startDate){
  if(!dateOK(startDate))throw Error('Invalid week');
  const all=normalizeLedger(ledger).days;
- const collect=start=>{const days=all.filter(d=>d.date>=start&&d.date<shiftDay(start,7));const sum=k=>days.reduce((n,d)=>n+d[k],0);return {startDate:start,observedDays:days.length,completeDays:days.filter(d=>d.complete).length,studyMinutes:sum('studyMinutes'),entertainmentMinutes:sum('entertainmentMinutes'),studyAppMinutes:sum('studyAppMinutes'),neutralMinutes:sum('neutralMinutes'),averageStudyMinutes:days.length?sum('studyMinutes')/days.length:null,averageEntertainmentMinutes:days.length?sum('entertainmentMinutes')/days.length:null,studyGoalSuccessDays:days.filter(d=>d.complete&&d.goalCompleted).length,budgetSuccessDays:days.filter(d=>d.complete&&d.budgetSuccess===true).length,budgetEligibleDays:days.filter(d=>d.complete&&d.budgetMinutes!==null).length,interventionCount:sum('interventionCount'),recoveryCount:sum('recoveryCount'),modeDistribution:Object.fromEntries(modes.map(m=>[m,days.filter(d=>d.mode===m).length]))}};
+ const collect=start=>{const days=all.filter(d=>d.date>=start&&d.date<shiftDay(start,7));const sum=k=>days.reduce((n,d)=>n+d[k],0);return {startDate:start,observedDays:days.length,completeDays:days.filter(d=>d.complete).length,studyMinutes:sum('studyMinutes'),entertainmentMinutes:sum('entertainmentMinutes'),studyAppMinutes:sum('studyAppMinutes'),neutralMinutes:sum('neutralMinutes'),averageStudyMinutes:days.length?sum('studyMinutes')/days.length:null,averageEntertainmentMinutes:days.length?sum('entertainmentMinutes')/days.length:null,studyGoalSuccessDays:days.filter(d=>d.complete&&d.goalCompleted).length,budgetSuccessDays:days.filter(d=>d.complete&&d.budgetSuccess===true).length,budgetEligibleDays:days.filter(d=>d.complete&&d.budgetMinutes!==null).length,interventionCount:sum('interventionCount'),recoveryCount:sum('recoveryCount'),categoryCoverage:days.every(d=>d.categoryCoverage),modeDistribution:Object.fromEntries(modes.map(m=>[m,days.filter(d=>d.mode===m).length]))}};
  const current=collect(startDate),previous=collect(shiftDay(startDate,-7));
  const comparable=current.completeDays===7&&previous.completeDays===7;
  return {...current,comparisonAvailable:comparable,studyDeltaMinutes:comparable?current.studyMinutes-previous.studyMinutes:null,entertainmentDeltaMinutes:comparable?current.entertainmentMinutes-previous.entertainmentMinutes:null};
@@ -68,4 +69,22 @@ export function weeklyContext(ledger,startDate,{enabled=true,relevant=false}={})
  if(!enabled||!relevant)return null;
  const s=weeklySummary(ledger,startDate);
  return {observedDays:s.observedDays,completeDays:s.completeDays,studyMinutes:s.studyMinutes,studyGoalSuccessDays:s.studyGoalSuccessDays,entertainmentMinutes:s.entertainmentMinutes,budgetSuccessDays:s.budgetSuccessDays,studyDeltaVsPreviousWeek:s.studyDeltaMinutes,entertainmentDeltaVsPreviousWeek:s.entertainmentDeltaMinutes,selectedInsights:behaviorInsights(ledger).map(i=>({type:i.type,text:i.text}))};
+}
+export const isWeeklyQuestion=text=>/^(今週|先週)(は|の記録は)?(どうだった|どう|どんな感じ|の記録|を振り返って)[?？。！!]*$/.test(String(text).trim());
+export function weekStart(now,previous=false){const d=localDay(now),weekday=new Date(d+'T00:00:00Z').getUTCDay();return shiftDay(d,-((weekday+6)%7)-(previous?7:0))}
+export function weeklyReply(context){if(!context||context.observedDays===0)return '生活バランスの週次記録はまだありません。記録が揃ってから一緒に振り返りましょう。';return `記録のある${context.observedDays}日分では、勉強は${Math.floor(context.studyMinutes/60)}時間${Math.floor(context.studyMinutes%60)}分、娯楽は${Math.floor(context.entertainmentMinutes/60)}時間${Math.floor(context.entertainmentMinutes%60)}分です。${context.studyDeltaVsPreviousWeek===null?'先週との比較に必要な記録はまだ揃っていません。':`先週より勉強が${Math.abs(context.studyDeltaVsPreviousWeek)}分${context.studyDeltaVsPreviousWeek>=0?'増え':'減り'}ています。`}`}
+/** Current native bridge provides a partial day; never claim that it is a complete day. */
+export function aggregateFromSnapshot(snapshot,sessions=[],zone=Intl.DateTimeFormat().resolvedOptions().timeZone){
+ if(snapshot?.permissionGranted!==true)return null;
+ const observedAt=snapshot.observedAt,date=localDay(observedAt,zone);
+ if(date!==snapshot.day)throw Error('Timezone changed during snapshot');
+ // Date uses the device zone. Explicit other-zone callers must supply native boundaries.
+ let startMs=snapshot.startMs;
+ if(startMs===undefined){if(zone!==Intl.DateTimeFormat().resolvedOptions().timeZone)throw Error('Native day boundary required');const d=new Date(observedAt);d.setHours(0,0,0,0);startMs=d.getTime()}
+ if(observedAt===startMs)return null;
+ const starts=sessions.filter(s=>s.startTimestamp>=startMs&&s.startTimestamp<observedAt).map(s=>s.startTimestamp);
+ const first=starts.length?Math.min(...starts):null;
+ const parts=first===null?null:new Intl.DateTimeFormat('en-GB',{timeZone:zone,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(first);
+ const minute=parts?Number(parts.find(p=>p.type==='hour').value)*60+Number(parts.find(p=>p.type==='minute').value):null;
+ return dailyAggregate({date,timeZone:zone,startMs,endMs:observedAt,observedAt,complete:false,mode:snapshot.dailyMode,budgetMinutes:snapshot.entertainmentBudgetMinutes,studyMinutes:snapshot.studyCompletedMinutes,goalMinutes:snapshot.studyGoalMinutes,entertainmentMinutes:snapshot.entertainmentUsedMinutes,studyAppMinutes:snapshot.studyAppMinutes,neutralMinutes:snapshot.neutralMinutes,categoryCoverage:snapshot.studyAppMinutes!==undefined&&snapshot.neutralMinutes!==undefined,firstStudyStartMinute:minute});
 }
