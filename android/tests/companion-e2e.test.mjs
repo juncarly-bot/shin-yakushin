@@ -106,6 +106,29 @@ test('the settings screen exposes proactivity and 今日は静かに',()=>{
  assert.match(ui,/command\('companion',\{quietDay:today\(\)\}\)/);
 });
 
+test('late night stays quiet about generic study but still keeps a promise',()=>{
+ const {app,setClock}=setup();
+ const m=app.command('saveEntity',{kind:'materials',title:'夜の続き',target:100,progress:0,unit:'ページ'}).materials[0];
+ setClock(Date.parse('2026-09-10T14:00:00Z')); // 23:00 JST
+ app.command('start',{sessionId:'late',relatedMaterialId:m.id});
+ setClock(Date.parse('2026-09-10T14:30:00Z'));
+ app.command('finish',{sessionId:'late'});
+ const late=Date.parse('2026-09-11T14:30:00Z'); // 23:30 JST the next day
+ setClock(late);
+ assert.equal(evaluate(app.state,late),null,'late night does not push a generic continuation');
+ app.command('commitment',{kind:'START_STUDY',title:m.title,dueAt:late,minutes:15,relatedMaterialId:m.id});
+ assert.equal(evaluate(app.state,late+60000).kind,InitiativeKind.FOLLOW_UP_COMMITMENT,'an explicit promise is honoured at night');
+});
+
+test('home shows an open promise with real start, snooze and decline actions',()=>{
+ assert.match(ui,/function commitmentCard\(\)/);
+ assert.match(ui,/data-action="startPromised"/);
+ assert.match(ui,/data-action="snoozeCommitment"/);
+ assert.match(ui,/data-action="declineCommitment"/);
+ assert.match(ui,/commitmentCard\(\)\}\$\{previousCard\(\)/);
+ assert.match(ui,/import \{formatClock\} from '\.\/commitments\.js'/);
+});
+
 test('proactivity and a quiet day survive restart and never silence a real promise',()=>{
  const {host,app,clock,setClock}=setup();const m=studied(app);const at=T+DAY;
  app.command('companion',{proactivity:'LOW'});

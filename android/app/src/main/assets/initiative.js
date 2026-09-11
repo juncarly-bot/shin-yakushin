@@ -88,9 +88,9 @@ export function evaluate(s,now,{source='open'}={}){
  }
  const day=report(s,now,today,today),studiedMinutes=Math.floor(day.seconds/60),goal=Number(s.settings?.lifeBalance?.studyGoalMinutes||0);
  if(goal>0&&studiedMinutes>=goal)return null;
- const previous=previousStudy(s),hour=Number(new Date(now+offset*60000).toISOString().slice(11,13));
+ const previous=previousStudy(s),hour=Number(new Date(now+offset*60000).toISOString().slice(11,13)),lateNight=hour>=23||hour<5;
  const previousDay=previous&&dateKey(previous.lastStudied,offset)!==today;
- if(previous&&previousDay&&(goal===0||studiedMinutes<goal)){
+ if(!lateNight&&previous&&previousDay&&(goal===0||studiedMinutes<goal)){
   const item=previous.item,material=previous.material??(previous.kind==='materials'?item:null),title=material?.title??item.title;
   const related={relatedMaterialId:previous.kind==='materials'?item.id:item.relatedMaterialId??null,relatedTaskId:previous.kind==='tasks'?item.id:null,relatedGoalId:item.relatedGoalId??null};
   const kind=previous.kind==='tasks'?InitiativeKind.RESUME_UNFINISHED_TASK:InitiativeKind.CONTINUE_PREVIOUS_STUDY;
@@ -99,16 +99,16 @@ export function evaluate(s,now,{source='open'}={}){
    actionOptions:commitmentActions({minutes:DEFAULT_MINUTES,...related},DEFAULT_MINUTES),expiresAt:now+6*HOUR,priority:60,...related});
  }
  const plan=(s.plans??[]).find(p=>p.date===today&&!p.done&&!p.archived);
- if(plan)return proposal({id:`START_SMALL_SESSION:${plan.id}`,kind:InitiativeKind.START_SMALL_SESSION,createdAt:now,speakerPlan:['SAYO'],reason:'today-plan',title:plan.title,
+ if(!lateNight&&plan)return proposal({id:`START_SMALL_SESSION:${plan.id}`,kind:InitiativeKind.START_SMALL_SESSION,createdAt:now,speakerPlan:['SAYO'],reason:'today-plan',title:plan.title,
   messages:[{speaker:'SAYO',text:`今日は${plan.title}の予定だったね。`},{speaker:'SAYO',text:'小さく始めよっか。'}],
   actionOptions:commitmentActions({minutes:DEFAULT_MINUTES,relatedPlanId:plan.id,relatedTaskId:plan.relatedTaskId??null,relatedMaterialId:plan.relatedMaterialId??null,relatedGoalId:plan.relatedGoalId??null},DEFAULT_MINUTES),
   expiresAt:now+6*HOUR,priority:50,relatedPlanId:plan.id,relatedTaskId:plan.relatedTaskId??null,relatedMaterialId:plan.relatedMaterialId??null,relatedGoalId:plan.relatedGoalId??null});
  const nearly=(s.goals??[]).find(g=>!g.archived&&!g.done&&g.target>0&&g.progress/g.target>=0.8&&g.progress<g.target);
- if(nearly)return proposal({id:`RECORD_PROGRESS:${nearly.id}`,kind:InitiativeKind.RECORD_PROGRESS,createdAt:now,speakerPlan:['NurseT'],reason:'goal-nearly-complete',title:nearly.title,
+ if(!lateNight&&nearly)return proposal({id:`RECORD_PROGRESS:${nearly.id}`,kind:InitiativeKind.RECORD_PROGRESS,createdAt:now,speakerPlan:['NurseT'],reason:'goal-nearly-complete',title:nearly.title,
   messages:[{speaker:'NurseT',text:`目標まであと${Math.max(0,nearly.target-nearly.progress)}${nearly.unit}ですね。`},{speaker:'NurseT',text:'今日は復習だけでもよさそうです。'}],
   actionOptions:[{id:'review',kind:ActionKind.REVIEW,label:'今日を振り返る'},{id:'later',kind:ActionKind.SNOOZE,label:'あとで',minutes:60}],expiresAt:now+6*HOUR,priority:40,relatedGoalId:nearly.id});
  const mode=s.settings?.lifeBalance?.dailyMode??'NORMAL';
- const weekly=source==='open'&&mode!=='FOCUS'&&hour>=18&&new Date(now+offset*60000).getUTCDay()===0&&day.sessions.length>0;
+ const weekly=source==='open'&&mode!=='FOCUS'&&hour>=18&&hour<23&&new Date(now+offset*60000).getUTCDay()===0&&day.sessions.length>0;
  if(weekly)return proposal({id:'REVIEW_WEEK',kind:InitiativeKind.REVIEW_WEEK,createdAt:now,speakerPlan:['NurseT'],reason:'weekly-review',title:'今週の振り返り',
   messages:[{speaker:'NurseT',text:'今週の記録を、一緒に振り返りませんか？'}],actionOptions:[{id:'review',kind:ActionKind.REVIEW,label:'振り返る'},{id:'later',kind:ActionKind.SNOOZE,label:'あとで',minutes:180}],expiresAt:now+12*HOUR,priority:30});
  return null;
