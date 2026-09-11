@@ -95,6 +95,11 @@ public final class MainActivity extends Activity {
             try{return LifeBalanceCheck.run(MainActivity.this,System.currentTimeMillis()).toString();}
             catch(Throwable failure){return "{\"checked\":false,\"reason\":\"error\"}";}
         }
+        /** Debug builds only: run the same read-only check the one-time commitment worker runs. */
+        @JavascriptInterface public String runCommitmentCheck(){
+            try{return CommitmentCheck.run(MainActivity.this,System.currentTimeMillis()).toString();}
+            catch(Throwable failure){return "{\"checked\":false,\"reason\":\"error\"}";}
+        }
         @JavascriptInterface public void requestLaunchableApps(){io.execute(()->{
             String catalog=LaunchableApps.read(MainActivity.this);
             runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformLaunchableApps && window.platformLaunchableApps("+JSONObject.quote(catalog)+")",null);});

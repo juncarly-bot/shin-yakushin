@@ -2,6 +2,14 @@ import test from 'node:test';import assert from 'node:assert/strict';import {rea
 const read=p=>readFileSync(new URL('../app/src/main/assets/'+p,import.meta.url),'utf8');
 const ui=read('ui.js'),css=read('style.css');
 
+test('companions are shown with their display names, ids unchanged internally',()=>{
+ assert.match(ui,/小夜とTTちゃん/);
+ assert.match(ui,/'NurseT'\?'TTちゃん':'小夜'/);
+ assert.doesNotMatch(ui,/message-speaker">小夜 \/ SAYO/);
+ // formal credits and settings may still use the full name
+ assert.match(ui,/VOICEVOX:ナースロボ＿タイプＴ/);
+});
+
 test('typing indicator uses messenger labels for each companion',()=>{
  assert.match(ui,/が入力中…/);
  assert.match(ui,/が話しています…/);
