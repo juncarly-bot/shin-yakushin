@@ -18,13 +18,19 @@ public final class StateStore {
     private String loadStage="OPEN";
     public StateStore(Context context) throws Exception {
         this.context=context.getApplicationContext();file=new File(context.getFilesDir(),"study.sqlite3");
-        boolean existedBefore=file.exists();
         try {
             open(); loadStage="READ"; String raw=read();
             if(raw!=null){loadStage="VALIDATE";validate(raw);}
             else {
                 File backup=new File(context.getFilesDir(),"study.backup.json");
-                if(existedBefore||backup.exists()||new File(backup+".bak").exists()){loadStage="MISSING_ROW";throw new IOException("保存行が見つかりません");}
+                // open() creates an empty database as a side effect, so an earlier
+                // aborted open (for example a boot/alarm receiver that read nothing and
+                // returned) can leave study.sqlite3 with no committed row and no backup.
+                // A successful commit always writes a row, so an empty table without any
+                // backup holds no user data: keep the file untouched and start fresh
+                // instead of failing the whole app. A backup without a row still means
+                // data was lost, so that case keeps the explicit MISSING_ROW failure.
+                if(backup.exists()||new File(backup+".bak").exists()){loadStage="MISSING_ROW";throw new IOException("保存行が見つかりません");}
             }
         }
         catch(UnsupportedVersion ex){close();throw ex;}

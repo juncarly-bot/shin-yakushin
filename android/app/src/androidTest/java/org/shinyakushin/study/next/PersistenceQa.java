@@ -38,6 +38,16 @@ public final class PersistenceQa extends Instrumentation {
     public void onCreate(Bundle args){super.onCreate(args);start();}
     public void onStart(){
         test("fresh native open",()->{StateStore s=new StateStore(isolated("fresh"));try{check(s.read()==null,"not empty");}finally{s.close();}});
+        test("abandoned empty database reopens as fresh without losing the file",()->{
+            Context c=isolated("abandoned");StateStore s=new StateStore(c);
+            try{check(s.read()==null,"not empty");}finally{s.close();}
+            File file=new File(c.getFilesDir(),"study.sqlite3");check(file.exists(),"open did not create a database file");
+            s=new StateStore(c);
+            try{check(s.read()==null,"abandoned database reported content");
+                check(file.exists(),"abandoned database file was removed");
+                check(!new File(c.getFilesDir(),"study.backup.json").exists(),"unexpected backup appeared");}
+            finally{s.close();}
+        });
         test("old schema2 without optional fields survives restart",()->{
             Context c=isolated("old");String raw=fixture();StateStore s=new StateStore(c);
             try{s.commit(-1,raw,false);}finally{s.close();}

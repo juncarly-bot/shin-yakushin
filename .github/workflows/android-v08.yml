@@ -248,8 +248,11 @@ jobs:
           adb -s emulator-5554 shell pm list packages | tee installed-packages.txt
           adb -s emulator-5554 shell pm list instrumentation | tee instrumentation.txt
           grep -q "org.shinyakushin.study.next.PersistenceQa" instrumentation.txt
+          adb -s emulator-5554 shell dumpsys package org.shinyakushin.study.next.v07.preview | grep -E "firstInstallTime|lastUpdateTime" | tee install-times.txt || true
+          adb -s emulator-5554 shell run-as org.shinyakushin.study.next.v07.preview ls -la files | tee app-files-before-startup.txt || true
           adb -s emulator-5554 shell am instrument -w org.shinyakushin.study.next.v07.preview.test/org.shinyakushin.study.next.PersistenceQa | tee persistence-qa.txt
-          grep -q "PERSISTENCE_QA passed=9 failed=0" persistence-qa.txt
+          grep -q "PERSISTENCE_QA passed=10 failed=0" persistence-qa.txt
+          adb -s emulator-5554 shell run-as org.shinyakushin.study.next.v07.preview ls -la files | tee app-files-after-instrument.txt || true
           python3 tools/check_emulator_startup.py | tee app-startup.txt
 
       - name: Upload persistence evidence
@@ -262,6 +265,9 @@ jobs:
             android/persistence-qa.txt
             android/instrumentation.txt
             android/installed-packages.txt
+            android/install-times.txt
+            android/app-files-before-startup.txt
+            android/app-files-after-instrument.txt
             android/emulator-persistence.log
             android/accel-check.txt
             android/app-startup.txt
