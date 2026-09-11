@@ -18,7 +18,7 @@ public final class BreakReceiver extends BroadcastReceiver {
     }
     @Override public void onReceive(Context c,Intent intent){
         StateStore store=null;try{store=new StateStore(c);String raw=store.read();if(raw==null)return;
-            if(Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())||Intent.ACTION_MY_PACKAGE_REPLACED.equals(intent.getAction())){schedule(c,raw);return;}
+            if(Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())||Intent.ACTION_MY_PACKAGE_REPLACED.equals(intent.getAction())){schedule(c,raw);LifeBalanceScheduler.ensure(c);return;}
             JSONObject s=new JSONObject(raw),x=StateStore.active(s);if(x==null||x.isNull("breakUntil")||!s.getJSONObject("settings").optBoolean("notifications")||!permitted(c))return;
             if(x.getLong("breakUntil")>System.currentTimeMillis()){schedule(c,raw);return;}
             channel(c);PendingIntent open=PendingIntent.getActivity(c,201,new Intent(c,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);

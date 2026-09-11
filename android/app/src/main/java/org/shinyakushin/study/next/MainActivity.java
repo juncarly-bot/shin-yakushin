@@ -39,7 +39,7 @@ public final class MainActivity extends Activity {
                 try{return response(path.endsWith(".js")?"text/javascript":path.endsWith(".css")?"text/css":path.endsWith(".png")?"image/png":"text/html",200,"OK",getAssets().open(path.substring(1)));}catch(IOException ex){return response("text/plain",404,"Not found",new ByteArrayInputStream(new byte[0]));}
             }
         });
-        web.setWebChromeClient(new WebChromeClient());web.loadUrl(ORIGIN+"/index.html");BreakReceiver.channel(this);BreakReceiver.schedule(this,store.read());
+        web.setWebChromeClient(new WebChromeClient());web.loadUrl(ORIGIN+"/index.html");BreakReceiver.channel(this);BreakReceiver.schedule(this,store.read());LifeBalanceScheduler.ensure(this);
     }
     private WebResourceResponse response(String mime,int status,String reason,InputStream in){Map<String,String> h=new HashMap<>();h.put("Content-Security-Policy","default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'");h.put("X-Content-Type-Options","nosniff");return new WebResourceResponse(mime,"UTF-8",status,reason,h,in);}
     private String result(boolean ok,String raw,String error){try{JSONObject r=new JSONObject();r.put("ok",ok);r.put("raw",raw==null?JSONObject.NULL:raw);r.put("error",error);r.put("warning",store.warning());return r.toString();}catch(JSONException impossible){return "{\"ok\":false,\"error\":\"保存結果を確認できません\"}";}}
