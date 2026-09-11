@@ -67,3 +67,14 @@ export function nextDue(commitments,now=Date.now()){
 }
 
 export const formatClock=(at,offsetMinutes=540)=>`${pad(new Date(at+offsetMinutes*60000).getUTCHours())}:${pad(new Date(at+offsetMinutes*60000).getUTCMinutes())}`;
+
+/** Privacy-safe reminder copy, mirrored by CommitmentCopy.java. */
+export const CommitmentCopy=Object.freeze({
+ TITLE_SAYO:'約束の時間だよー',
+ BODY_SAYO:'昨日の続き、やろ？',
+ TITLE_NURSE_T:'そろそろ始める時間です。',
+ BODY_NURSE_T:'まず15分から始めますか？'
+});
+export const commitmentMessage=owner=>owner==='NurseT'
+ ?{title:CommitmentCopy.TITLE_NURSE_T,body:CommitmentCopy.BODY_NURSE_T}
+ :{title:CommitmentCopy.TITLE_SAYO,body:CommitmentCopy.BODY_SAYO};

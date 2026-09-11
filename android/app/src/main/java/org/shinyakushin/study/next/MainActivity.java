@@ -25,7 +25,7 @@ public final class MainActivity extends Activity {
     private AppUsageRepository appUsage;
     private final ExecutorService io=Executors.newSingleThreadExecutor();
     private boolean webReady=false;
-    private String pendingIntervention=null;
+    private String pendingIntervention=null,pendingCommitment=null;
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
         try{store=new StateStore(this);}catch(Exception ex){TextView text=new TextView(this);text.setPadding(32,80,32,32);text.setText("記録を開けませんでした\n\n"+ex.getMessage()+"\n\n元データは保持しています。アプリのデータを消去しないでください。");setContentView(text);return;}
@@ -36,14 +36,14 @@ public final class MainActivity extends Activity {
         web.addJavascriptInterface(new Bridge(),"AndroidStore");
         web.setWebViewClient(new WebViewClient(){
             @Override public boolean shouldOverrideUrlLoading(WebView w,WebResourceRequest r){return true;}
-            @Override public void onPageFinished(WebView w,String url){webReady=true;String queued=pendingIntervention;pendingIntervention=null;if(queued!=null)dispatchIntervention(queued);}
+            @Override public void onPageFinished(WebView w,String url){webReady=true;String queued=pendingIntervention;pendingIntervention=null;if(queued!=null)dispatchIntervention(queued);String due=pendingCommitment;pendingCommitment=null;if(due!=null)dispatchCommitment(due);}
             @Override public WebResourceResponse shouldInterceptRequest(WebView w,WebResourceRequest req){
                 Uri u=req.getUrl();String path=u.getPath();Set<String> allowed=new HashSet<>(Arrays.asList("/index.html","/ui.js","/domain.js","/reactions.js","/templates.js","/platform.js","/style.css","/avatar-sheet.png","/timeline.js","/orchestrator.js","/conversation.js","/conversation-shape.js","/characters.js","/companion.js","/voice-settings.js","/remote-ai.js","/life-balance.js","/life-balance-analytics.js","/life-balance-compat.js","/migration-verify.js","/latency.js","/voice-chunks.js","/commitments.js","/initiative.js"));
                 if(!"https".equals(u.getScheme())||!"appassets.androidplatform.net".equals(u.getHost())||!allowed.contains(path))return response("text/plain",404,"Not found",new ByteArrayInputStream(new byte[0]));
                 try{return response(path.endsWith(".js")?"text/javascript":path.endsWith(".css")?"text/css":path.endsWith(".png")?"image/png":"text/html",200,"OK",getAssets().open(path.substring(1)));}catch(IOException ex){return response("text/plain",404,"Not found",new ByteArrayInputStream(new byte[0]));}
             }
         });
-        web.setWebChromeClient(new WebChromeClient());web.loadUrl(ORIGIN+"/index.html");BreakReceiver.channel(this);LifeBalanceNotifier.ensureChannel(this);BreakReceiver.schedule(this,store.read());LifeBalanceScheduler.ensure(this);handleIntervention(getIntent());
+        web.setWebChromeClient(new WebChromeClient());web.loadUrl(ORIGIN+"/index.html");BreakReceiver.channel(this);LifeBalanceNotifier.ensureChannel(this);CommitmentNotifier.ensureChannel(this);String initial=store.read();BreakReceiver.schedule(this,initial);LifeBalanceScheduler.ensure(this);CommitmentScheduler.ensure(this,initial);handleIntervention(getIntent());handleCommitment(getIntent());
     }
     private WebResourceResponse response(String mime,int status,String reason,InputStream in){Map<String,String> h=new HashMap<>();h.put("Content-Security-Policy","default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'");h.put("X-Content-Type-Options","nosniff");return new WebResourceResponse(mime,"UTF-8",status,reason,h,in);}
     private String result(boolean ok,String raw,String error){try{JSONObject r=new JSONObject();r.put("ok",ok);r.put("raw",raw==null?JSONObject.NULL:raw);r.put("error",error);r.put("warning",store.warning());return r.toString();}catch(JSONException impossible){return "{\"ok\":false,\"error\":\"保存結果を確認できません\"}";}}
@@ -66,7 +66,7 @@ public final class MainActivity extends Activity {
             });
         }
         @JavascriptInterface public String read(){try{return result(true,store.read(),"");}catch(Exception ex){return result(false,null,ex.getMessage());}}
-        @JavascriptInterface public String commit(long revision,String raw,boolean restore){try{store.commit(revision,raw,restore);BreakReceiver.schedule(MainActivity.this,raw);return result(true,store.read(),"");}catch(Exception ex){return result(false,null,ex.getMessage());}}
+        @JavascriptInterface public String commit(long revision,String raw,boolean restore){try{store.commit(revision,raw,restore);BreakReceiver.schedule(MainActivity.this,raw);CommitmentScheduler.ensure(MainActivity.this,raw);return result(true,store.read(),"");}catch(Exception ex){return result(false,null,ex.getMessage());}}
         @JavascriptInterface public void exportData(){runOnUiThread(()->{Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/json").addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE,"新躍進政策-"+java.time.LocalDate.now()+".json");startActivityForResult(i,EXPORT);});}
         @JavascriptInterface public void importData(){runOnUiThread(()->{Intent i=new Intent(Intent.ACTION_GET_CONTENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,IMPORT);});}
         @JavascriptInterface public void enableNotifications(){runOnUiThread(()->{if(Build.VERSION.SDK_INT>=33&&!BreakReceiver.permitted(MainActivity.this))requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NOTIFICATIONS);else{BreakReceiver.schedule(MainActivity.this,store.read());message("通知の設定を確認しました。休憩は通知なしでも利用できます。");}});}
@@ -118,7 +118,18 @@ public final class MainActivity extends Activity {
         if(!webReady){pendingIntervention=json;return;}
         if(web!=null)web.evaluateJavascript("window.platformIntervention && window.platformIntervention("+JSONObject.quote(json)+")",null);
     }
-    @Override public void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);handleIntervention(intent);}
+    /** Minimal promise payload only; taps reuse the existing conversation and never duplicate it. */
+    private void handleCommitment(Intent intent){
+        if(intent==null||!CommitmentNotifier.ACTION.equals(intent.getAction()))return;
+        String id=intent.getStringExtra("commitmentId");
+        if(id==null||id.isEmpty())return;
+        try{JSONObject payload=new JSONObject().put("commitmentId",id).put("at",intent.getLongExtra("at",0));dispatchCommitment(payload.toString());}catch(JSONException ignored){}
+    }
+    private void dispatchCommitment(String json){
+        if(!webReady){pendingCommitment=json;return;}
+        if(web!=null)web.evaluateJavascript("window.platformCommitment && window.platformCommitment("+JSONObject.quote(json)+")",null);
+    }
+    @Override public void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);handleIntervention(intent);handleCommitment(intent);}
     private void message(String text){runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformMessage && window.platformMessage("+JSONObject.quote(text)+")",null);});}
     private void remoteFailure(String requestId){runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformRemoteAIError && window.platformRemoteAIError("+JSONObject.quote(requestId)+")",null);});}
     @Override public void onActivityResult(int request,int resultCode,Intent data){super.onActivityResult(request,resultCode,data);if(resultCode!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();io.execute(()->{try{
