@@ -7,8 +7,10 @@ from pathlib import Path
 if os.environ.get('GITHUB_ACTIONS') != 'true':
     raise SystemExit('This check only runs on the disposable GitHub CI emulator')
 
-def adb(*args, timeout=30):
-    return subprocess.check_output(['adb', '-s', 'emulator-5554', *args], timeout=timeout)
+EMULATOR = ('adb', '-s', 'emulator-5554')
+
+def adb(*args, timeout=60):
+    return subprocess.check_output([*EMULATOR, *args], timeout=timeout)
 
 if adb('shell', 'getprop', 'ro.kernel.qemu').strip() != b'1':
     raise SystemExit('Refusing to run on a non-emulator device')
@@ -16,6 +18,24 @@ if adb('shell', 'getprop', 'ro.kernel.qemu').strip() != b'1':
 package = 'org.shinyakushin.study.next.v07.preview'
 component = package + '/org.shinyakushin.study.next.MainActivity'
 adb('shell', 'wm', 'dismiss-keyguard')
+
+def assert_process_alive(label):
+    pid = adb('shell', 'pidof', package).decode().strip()
+    if not pid:
+        raise AssertionError(label + ': app process is not alive')
+    print(label + ': process alive pid=' + pid, flush=True)
+    return pid
+
+def assert_no_fatal_exception(label):
+    pid = assert_process_alive(label)
+    log = adb('logcat', '-d', '--pid=' + pid).decode(errors='replace')
+    Path('app-startup-logcat.txt').write_text(log)
+    if 'FATAL EXCEPTION' in log:
+        raise AssertionError(label + ': FATAL EXCEPTION in app logcat')
+    crash = adb('logcat', '-d', '-b', 'crash').decode(errors='replace')
+    Path('app-startup-crash.log').write_text(crash)
+    if package in crash:
+        raise AssertionError(label + ': crash buffer mentions ' + package)
 
 def launch_and_check(label):
     launch = adb('shell', 'am', 'start', '-W', '-n', component).decode()
@@ -36,6 +56,7 @@ def launch_and_check(label):
             raise AssertionError('Saved-state error screen is visible')
         if '小夜とTちゃん' in ui and '学ぶこと' in ui:
             print(label + ': PASS (Conversation UI visible)', flush=True)
+            assert_no_fatal_exception(label)
             return
         time.sleep(2)
     raise AssertionError('Conversation UI did not become visible before deadline')
@@ -47,6 +68,9 @@ try:
 finally:
     try:
         Path('app-startup.png').write_bytes(adb('exec-out', 'screencap', '-p'))
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        pass
+    try:
         Path('app-startup-crash.log').write_bytes(adb('logcat', '-d', '-b', 'crash'))
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         pass
