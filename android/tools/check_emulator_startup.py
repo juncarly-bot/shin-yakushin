@@ -59,7 +59,7 @@ def launch_and_check(label):
         if '記録を開けませんでした' in ui:
             print(ui, flush=True)
             raise AssertionError('Saved-state error screen is visible')
-        if '小夜とTちゃん' in ui and '学ぶこと' in ui:
+        if ('小夜とTTちゃん' in ui or '小夜とTちゃん' in ui) and '学ぶこと' in ui:
             print(label + ': PASS (Conversation UI visible)', flush=True)
             assert_no_fatal_exception(label)
             return
