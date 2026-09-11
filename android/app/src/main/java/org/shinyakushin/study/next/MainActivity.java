@@ -24,6 +24,8 @@ public final class MainActivity extends Activity {
     private RemoteAIClient remoteAI;
     private AppUsageRepository appUsage;
     private final ExecutorService io=Executors.newSingleThreadExecutor();
+    private boolean webReady=false;
+    private String pendingIntervention=null;
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
         try{store=new StateStore(this);}catch(Exception ex){TextView text=new TextView(this);text.setPadding(32,80,32,32);text.setText("記録を開けませんでした\n\n"+ex.getMessage()+"\n\n元データは保持しています。アプリのデータを消去しないでください。");setContentView(text);return;}
@@ -33,13 +35,14 @@ public final class MainActivity extends Activity {
         web.addJavascriptInterface(new Bridge(),"AndroidStore");
         web.setWebViewClient(new WebViewClient(){
             @Override public boolean shouldOverrideUrlLoading(WebView w,WebResourceRequest r){return true;}
+            @Override public void onPageFinished(WebView w,String url){webReady=true;String queued=pendingIntervention;pendingIntervention=null;if(queued!=null)dispatchIntervention(queued);}
             @Override public WebResourceResponse shouldInterceptRequest(WebView w,WebResourceRequest req){
                 Uri u=req.getUrl();String path=u.getPath();Set<String> allowed=new HashSet<>(Arrays.asList("/index.html","/ui.js","/domain.js","/reactions.js","/templates.js","/platform.js","/style.css","/avatar-sheet.png","/timeline.js","/orchestrator.js","/conversation.js","/conversation-shape.js","/characters.js","/companion.js","/voice-settings.js","/remote-ai.js","/life-balance.js"));
                 if(!"https".equals(u.getScheme())||!"appassets.androidplatform.net".equals(u.getHost())||!allowed.contains(path))return response("text/plain",404,"Not found",new ByteArrayInputStream(new byte[0]));
                 try{return response(path.endsWith(".js")?"text/javascript":path.endsWith(".css")?"text/css":path.endsWith(".png")?"image/png":"text/html",200,"OK",getAssets().open(path.substring(1)));}catch(IOException ex){return response("text/plain",404,"Not found",new ByteArrayInputStream(new byte[0]));}
             }
         });
-        web.setWebChromeClient(new WebChromeClient());web.loadUrl(ORIGIN+"/index.html");BreakReceiver.channel(this);LifeBalanceNotifier.ensureChannel(this);BreakReceiver.schedule(this,store.read());LifeBalanceScheduler.ensure(this);
+        web.setWebChromeClient(new WebChromeClient());web.loadUrl(ORIGIN+"/index.html");BreakReceiver.channel(this);LifeBalanceNotifier.ensureChannel(this);BreakReceiver.schedule(this,store.read());LifeBalanceScheduler.ensure(this);handleIntervention(getIntent());
     }
     private WebResourceResponse response(String mime,int status,String reason,InputStream in){Map<String,String> h=new HashMap<>();h.put("Content-Security-Policy","default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'");h.put("X-Content-Type-Options","nosniff");return new WebResourceResponse(mime,"UTF-8",status,reason,h,in);}
     private String result(boolean ok,String raw,String error){try{JSONObject r=new JSONObject();r.put("ok",ok);r.put("raw",raw==null?JSONObject.NULL:raw);r.put("error",error);r.put("warning",store.warning());return r.toString();}catch(JSONException impossible){return "{\"ok\":false,\"error\":\"保存結果を確認できません\"}";}}
@@ -80,6 +83,20 @@ public final class MainActivity extends Activity {
         });}
         @JavascriptInterface public void openUsageAccessSettings(){runOnUiThread(()->{try{startActivity(appUsage.usageAccessIntent());}catch(RuntimeException ex){message("使用状況へのアクセス設定を開けませんでした。");}});}
     }
+    /** Minimal notification payload only; raw Usage events never enter the Intent. */
+    private void handleIntervention(Intent intent){
+        if(intent==null||!LifeBalanceNotifier.ACTION.equals(intent.getAction()))return;
+        String id=intent.getStringExtra("interventionId");
+        if(id==null||id.isEmpty())return;
+        try{JSONObject payload=new JSONObject().put("interventionId",id).put("speaker",intent.getStringExtra("speaker"))
+            .put("reason",intent.getStringExtra("reason")).put("day",intent.getStringExtra("day")).put("at",intent.getLongExtra("at",0));
+            dispatchIntervention(payload.toString());}catch(JSONException ignored){}
+    }
+    private void dispatchIntervention(String json){
+        if(!webReady){pendingIntervention=json;return;}
+        if(web!=null)web.evaluateJavascript("window.platformIntervention && window.platformIntervention("+JSONObject.quote(json)+")",null);
+    }
+    @Override public void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);handleIntervention(intent);}
     private void message(String text){runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformMessage && window.platformMessage("+JSONObject.quote(text)+")",null);});}
     private void remoteFailure(String requestId){runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformRemoteAIError && window.platformRemoteAIError("+JSONObject.quote(requestId)+")",null);});}
     @Override public void onActivityResult(int request,int resultCode,Intent data){super.onActivityResult(request,resultCode,data);if(resultCode!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();io.execute(()->{try{

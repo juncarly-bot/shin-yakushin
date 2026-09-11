@@ -3,7 +3,7 @@ import {previousStudy,voiceSettings,speechRequest,inQuietHours,ContextAssembler}
 import {RemoteAIProvider,remoteRequest} from './remote-ai.js';
 import {StudyApplication} from './platform.js';
 import {active,totals,report,metrics,dateKey,dateMs,shiftDate,entity} from './domain.js';
-import {coachingFromSnapshot,coachingMessage} from './life-balance.js';
+import {coachingFromSnapshot,coachingMessage,interventionMessage} from './life-balance.js';
 const root=document.querySelector('#app'),dialog=document.querySelector('#editor');
 const host=window.AndroidStore;
 let appCatalog=[];
@@ -12,6 +12,8 @@ function balanceText(s){if(!s?.permissionGranted)return '使用状況は未取�
 /** Real Usage + real Study snapshot decides locally; Usage and Study are never written here. */
 function applyCoaching(){if(!S||!dailyBalance)return;const decision=coachingFromSnapshot(dailyBalance,S.settings.lifeBalance||{},now());if(decision.level==='NONE')return;if(S.settings.lifeBalance?.lastInterventionId===decision.interventionId)return;const text=coachingMessage(decision,decision.budget);if(!text)return;if(command('intervention',{interventionId:decision.interventionId,speaker:decision.speaker,reason:decision.reason,text})&&page==='chat')render()}
 window.platformDailyBalance=raw=>{try{dailyBalance=JSON.parse(raw);const el=document.querySelector('#daily-balance-summary');if(el)el.textContent=balanceText(dailyBalance);applyCoaching()}catch{dailyBalance=null}};
+/** Notification tap: merge one intervention into the existing conversation, then open it. */
+window.platformIntervention=raw=>{try{if(!S)return;const p=JSON.parse(raw)||{};if(!p.interventionId)return;const already=S.settings?.lifeBalance?.lastInterventionId===p.interventionId;if(!already){const text=interventionMessage(p.reason,p.speaker).body;if(!command('intervention',{interventionId:p.interventionId,speaker:p.speaker,reason:p.reason,text}))return}page='chat';render()}catch{toast('介入メッセージを開けませんでした')}};
 root.addEventListener('click',e=>{if(e.target.closest('[data-page="settings"],[data-action="refreshBalance"]'))host.requestDailyBalance?.()});
 function appCatalogRows(apps,categories){return apps.map(a=>`<label class="item">${a.icon?`<img width="48" height="48" alt="" src="${E(a.icon)}">`:''}<strong>${E(a.label)}</strong><small>${E(a.packageName)}</small><select data-app-category="${E(a.packageName)}">${[['ENTERTAINMENT','娯楽'],['STUDY','学習'],['NEUTRAL','対象外']].map(([v,l])=>`<option value="${v}" ${(categories[a.packageName]||'NEUTRAL')===v?'selected':''}>${l}</option>`).join('')}</select></label>`).join('')}
 function showAppCatalog(){open(`<h2>アプリの使い方</h2><p>分類は端末内に保存します。使用状況の許可なしでも選択できます。</p><input id="app-search" placeholder="アプリ名・packageで検索" aria-label="アプリ検索"><div id="app-catalog-rows">${appCatalogRows(appCatalog.slice(0,40),S.settings.lifeBalance?.appCategories||{})}</div><p>最大40件ずつ表示します。検索で絞り込めます。</p><button data-action="cancel">閉じる</button>`)}
