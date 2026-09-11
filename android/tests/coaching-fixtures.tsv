@@ -1,0 +1,11 @@
+# name	mode	limit	used	goal	completed	interventionLevel	cooldown	lastAt	now	level	speaker	reason
+NORMAL low study over budget selects NurseT	NORMAL	90	95	180	20	NORMAL	120	0	1700000000000	STRICT	NurseT	budget-exceeded
+NORMAL near goal over budget stays gentle	NORMAL	90	95	180	175	NORMAL	120	0	1700000000000	NORMAL	NurseT	budget-exceeded
+NORMAL goal complete never scolds	NORMAL	90	95	180	210	NORMAL	120	0	1700000000000	NONE	SAYO	goal-complete
+NORMAL within budget stays silent	NORMAL	90	80	180	20	NORMAL	120	0	1700000000000	NONE	null	within-budget
+HOLIDAY over budget is suppressed	HOLIDAY	180	189	180	20	NORMAL	120	0	1700000000000	NONE	null	mode
+FOCUS real 82 of 60 with low study is strict	FOCUS	60	82	180	35	NORMAL	120	0	1700000000000	STRICT	NurseT	budget-exceeded
+UNLIMITED never intervenes	UNLIMITED	0	999	180	20	NORMAL	120	0	1700000000000	NONE	null	mode
+cooldown suppresses a recent intervention	NORMAL	90	95	180	20	NORMAL	120	1699999100000	1700000000000	NONE	null	cooldown
+GENTLE level is respected when progress is healthy	NORMAL	90	95	180	170	GENTLE	120	0	1700000000000	GENTLE	NurseT	budget-exceeded
+zero study goal with exceeded budget is strict	NORMAL	90	95	0	0	NORMAL	120	0	1700000000000	STRICT	NurseT	budget-exceeded

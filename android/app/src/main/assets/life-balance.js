@@ -20,3 +20,30 @@ export function weeklyUsageSummary(days=[],previous={}){
   for(const d of days){out.studyMinutes+=Number(d.studyMinutes||0);out.entertainmentMinutes+=Number(d.entertainmentMinutes||0);if(d.budgetSuccess)out.budgetSuccessDays++;if(d.studyGoalSuccess)out.studyGoalSuccessDays++;out.interventionCount+=Number(d.interventionCount||0);out.returnToStudyCount+=Number(d.returnToStudyCount||0);for(const [k,v] of Object.entries(d.categoryMinutes||{}))out.categoryMinutes[k]=(out.categoryMinutes[k]||0)+Number(v||0)}
   return {...out,previousStudyMinutes:Number(previous.studyMinutes||0),studyDeltaMinutes:out.studyMinutes-Number(previous.studyMinutes||0)};
 }
+/** Build the aggregate budget from a real LifeBalanceSnapshot without re-reading Usage. */
+export function budgetFromSnapshot(snapshot={}){
+  const unlimited=snapshot.dailyMode===DailyModes.UNLIMITED||snapshot.entertainmentBudgetMinutes===null;
+  const limit=unlimited?null:Math.max(0,Number(snapshot.entertainmentBudgetMinutes??90));
+  const used=Math.max(0,Number(snapshot.entertainmentUsedMinutes||0));
+  return {mode:snapshot.dailyMode,limit,usedMinutes:used,remainingMinutes:unlimited?null:Math.max(0,limit-used),exceededMinutes:unlimited?0:Math.max(0,used-limit),ratio:unlimited||limit===0?0:used/limit,unlimited};
+}
+/** Deterministic identity shared with the background worker so one day/reason fires once. */
+export function interventionIdFor(snapshot={},decision={},budget={}){
+  const step=decision.reason==='budget-exceeded'?Math.floor(Number(budget.exceededMinutes||0)/30):0;
+  return [snapshot.day||'',snapshot.dailyMode||DailyModes.NORMAL,decision.reason||'none',step].join('|');
+}
+/** Real Usage + real Study snapshot -> local policy. Never mutates Usage or Study. */
+export function coachingFromSnapshot(snapshot={},lifeBalance={},now=Date.now()){
+  const budget=budgetFromSnapshot(snapshot);
+  const decision=coachingDecision({dailyMode:snapshot.dailyMode,entertainmentBudget:budget,studyGoalMinutes:snapshot.studyGoalMinutes,studyCompletedMinutes:snapshot.studyCompletedMinutes,cooldownMinutes:lifeBalance.cooldownMinutes,interventionLevel:lifeBalance.interventionLevel,lastInterventionAt:lifeBalance.lastInterventionAt,now});
+  const interventionId=interventionIdFor(snapshot,decision,budget);
+  const duplicate=decision.level!=='NONE'&&lifeBalance.lastInterventionId===interventionId;
+  return {...decision,budget,interventionId,day:snapshot.day||'',suppressed:duplicate,level:duplicate?'NONE':decision.level,speaker:duplicate?null:decision.speaker,reason:duplicate?'duplicate':decision.reason};
+}
+/** Short local text only; raw usage minutes never leave the device. */
+export function coachingMessage(decision={},budget={}){
+  if(decision.reason==='goal-complete')return '今日の目標まで届いたね。よく頑張った。';
+  if(decision.reason!=='budget-exceeded')return '';
+  const over=Math.max(0,Number(budget.exceededMinutes||0));
+  return decision.speaker==='NurseT'?`娯楽が予定を${over}分超えています。そろそろ学習の続きに戻りませんか？`:'少し休んだら、学習の続きに戻ろう。';
+}
