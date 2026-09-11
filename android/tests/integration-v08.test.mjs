@@ -83,7 +83,7 @@ test('history and the debug trigger are bridged natively and gated to debug buil
  assert.ok(main.includes('LifeBalanceHistory.read(MainActivity.this,store.read()'),'history is read-only from committed state');
  assert.ok(main.includes('window.platformDailyHistory'));
  assert.ok(main.includes('ApplicationInfo.FLAG_DEBUGGABLE'),'debug trigger uses the debuggable flag, not a release build config');
- assert.ok(main.includes('LifeBalanceCheck.run(this,System.currentTimeMillis())'),'debug trigger runs the same check as the worker');
+ assert.ok(main.includes('LifeBalanceCheck.run(MainActivity.this,System.currentTimeMillis())'),'debug trigger runs the same check as the worker from the inner bridge');
  const ui=asset('ui.js');
  assert.ok(ui.includes('host.debugToolsEnabled?.()'),'the QA button is hidden unless the host reports a debug build');
  assert.ok(ui.includes("host.runLifeBalanceNow?.()"));

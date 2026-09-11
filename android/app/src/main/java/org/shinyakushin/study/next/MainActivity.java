@@ -90,7 +90,7 @@ public final class MainActivity extends Activity {
         }
         /** Debug builds only: run the same read-only check the periodic worker runs. */
         @JavascriptInterface public String runLifeBalanceNow(){
-            try{return LifeBalanceCheck.run(this,System.currentTimeMillis()).toString();}
+            try{return LifeBalanceCheck.run(MainActivity.this,System.currentTimeMillis()).toString();}
             catch(Throwable failure){return "{\"checked\":false,\"reason\":\"error\"}";}
         }
         @JavascriptInterface public void requestLaunchableApps(){io.execute(()->{
