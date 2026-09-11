@@ -54,3 +54,11 @@ Merge DeepSeek's runtime work first, then these additive hooks. Review ui.js and
 ## Verification limits
 
 Node regression covers core compatibility, aggregate CAS/rollback, source preservation, week boundaries/DST, local conversation and remote payload privacy. This is not Android SQLite/device proof. Physical saved-data reopen, actual UsageStats, UI rendering on device, notification and audible VOICEVOX remain NOT VERIFIED on this branch. Emulator expansion is intentionally outside this parallel task.
+
+## Live overlap check
+
+Compared against runtime branch `ca5aa31a6c4daa0a35bf17617ca846a52d789834` during this session. Shared changed files are **ui.js, domain.js, MainActivity.java**.
+- ui.js has a genuine same-line conflict in `platformDailyBalance`: keep DeepSeek's `applyCoaching()` and then save the aggregate through the current `app`/`S`. Catch analytics failures independently so they do not suppress coaching. Preserve DeepSeek's launch/resume refresh hooks.
+- domain.js changes are separate: retain its `intervention` action and this branch's compatibility import/migration.
+- MainActivity changes are separate: retain its notifier/scheduler initialization and this branch's two additional asset paths.
+No merge has been performed. Rerun combined regression/build after manual integration; branch-local green CI is not proof of a merged build.
