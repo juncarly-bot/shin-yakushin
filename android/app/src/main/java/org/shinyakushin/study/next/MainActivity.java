@@ -30,6 +30,7 @@ public final class MainActivity extends Activity {
         super.onCreate(saved);
         try{store=new StateStore(this);}catch(Exception ex){TextView text=new TextView(this);text.setPadding(32,80,32,32);text.setText("記録を開けませんでした\n\n"+ex.getMessage()+"\n\n元データは保持しています。アプリのデータを消去しないでください。");setContentView(text);return;}
         voice=new VoiceController(this);remoteAI=new RemoteAIClient(this);appUsage=new AppUsageRepository(this);web=new WebView(this);web.setBackgroundColor(Color.rgb(245,244,238));setContentView(web);
+        voice.listener((name,at)->runOnUiThread(()->{if(web!=null&&webReady)web.evaluateJavascript("window.platformVoiceEvent && window.platformVoiceEvent("+JSONObject.quote(name)+","+at+")",null);}));
         web.setOnApplyWindowInsetsListener((view,insets)->{if(Build.VERSION.SDK_INT>=30){android.graphics.Insets bar=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.ime());view.setPadding(bar.left,bar.top,bar.right,bar.bottom);}else view.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());return insets;});
         WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(false);settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);settings.setJavaScriptCanOpenWindowsAutomatically(false);settings.setSupportMultipleWindows(false);
         web.addJavascriptInterface(new Bridge(),"AndroidStore");
@@ -37,7 +38,7 @@ public final class MainActivity extends Activity {
             @Override public boolean shouldOverrideUrlLoading(WebView w,WebResourceRequest r){return true;}
             @Override public void onPageFinished(WebView w,String url){webReady=true;String queued=pendingIntervention;pendingIntervention=null;if(queued!=null)dispatchIntervention(queued);}
             @Override public WebResourceResponse shouldInterceptRequest(WebView w,WebResourceRequest req){
-                Uri u=req.getUrl();String path=u.getPath();Set<String> allowed=new HashSet<>(Arrays.asList("/index.html","/ui.js","/domain.js","/reactions.js","/templates.js","/platform.js","/style.css","/avatar-sheet.png","/timeline.js","/orchestrator.js","/conversation.js","/conversation-shape.js","/characters.js","/companion.js","/voice-settings.js","/remote-ai.js","/life-balance.js","/life-balance-analytics.js","/life-balance-compat.js","/migration-verify.js","/latency.js"));
+                Uri u=req.getUrl();String path=u.getPath();Set<String> allowed=new HashSet<>(Arrays.asList("/index.html","/ui.js","/domain.js","/reactions.js","/templates.js","/platform.js","/style.css","/avatar-sheet.png","/timeline.js","/orchestrator.js","/conversation.js","/conversation-shape.js","/characters.js","/companion.js","/voice-settings.js","/remote-ai.js","/life-balance.js","/life-balance-analytics.js","/life-balance-compat.js","/migration-verify.js","/latency.js","/voice-chunks.js"));
                 if(!"https".equals(u.getScheme())||!"appassets.androidplatform.net".equals(u.getHost())||!allowed.contains(path))return response("text/plain",404,"Not found",new ByteArrayInputStream(new byte[0]));
                 try{return response(path.endsWith(".js")?"text/javascript":path.endsWith(".css")?"text/css":path.endsWith(".png")?"image/png":"text/html",200,"OK",getAssets().open(path.substring(1)));}catch(IOException ex){return response("text/plain",404,"Not found",new ByteArrayInputStream(new byte[0]));}
             }
@@ -51,6 +52,7 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public void speak(String raw){voice.speak(raw);}
         @JavascriptInterface public void speakBatch(String raw){voice.speakBatch(raw);}
         @JavascriptInterface public void cancelVoice(){voice.cancel();}
+        @JavascriptInterface public void prewarmVoice(){voice.prewarm();}
         @JavascriptInterface public void cancelRemoteAI(){if(remoteAI!=null)remoteAI.cancel();}
         @JavascriptInterface public String voiceStatus(){return voice.status();}
         @JavascriptInterface public boolean remoteAIAvailable(){return remoteAI!=null&&remoteAI.available();}

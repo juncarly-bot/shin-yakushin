@@ -31,6 +31,7 @@ public final class VoicevoxProvider implements VoiceProvider {
   if(!loaded.contains(speaker)){String file=speaker.equals("SAYO")?"15.vvm":"11.vvm";JSONArray meta=new JSONArray(load(handle,utf(new File(root,file).getPath())));Set<Integer> found=new HashSet<>();for(int i=0;i<meta.length();i++){JSONObject m=meta.getJSONObject(i);if(name.equals(m.getString("name"))){JSONArray styles=m.getJSONArray("styles");for(int j=0;j<styles.length();j++)found.add(styles.getJSONObject(j).getInt("id"));}}if(!found.contains(style)||speaker.equals("NurseT")&&!found.containsAll(Arrays.asList(47,48,49,50)))throw new IOException("VVMの話者とstyleが一致しません");loaded.add(speaker);}
   return synthesize(handle,utf(text),style);
  }
+ public void warmup()throws Exception{initialize();}
  public String identity(){return "voicevox-0.17.0-ort1.23.2-default-46-47";}
  public void close(){if(handle!=0){destroy(handle);handle=0;}loaded.clear();}
 }

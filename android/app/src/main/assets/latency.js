@@ -27,6 +27,7 @@ const ms=value=>`${Math.max(0,Math.round(value))}ms`;
 export function createLatencyTracker({enabled=false,clock=()=>Date.now(),sink=()=>{}}={}){
  const marks=new Map();
  const record=(name,at=clock())=>{if(!enabled)return null;if(!KNOWN.has(name))throw Error('unknown latency mark: '+name);marks.set(name,at);return at};
+ const recordOnce=(name,at=clock())=>{if(!enabled)return null;if(!KNOWN.has(name))throw Error('unknown latency mark: '+name);if(!marks.has(name))marks.set(name,at);return marks.get(name)};
  const delta=(from,to)=>{const a=marks.get(from),b=marks.get(to);return a===undefined||b===undefined?null:b-a};
  const lines=()=>{
   const out=[];
@@ -47,6 +48,7 @@ export function createLatencyTracker({enabled=false,clock=()=>Date.now(),sink=()
   get enabled(){return enabled},
   mark:record,
   markIfEnabled:record,
+  markOnce:recordOnce,
   has:name=>marks.has(name),
   delta,
   lines,
