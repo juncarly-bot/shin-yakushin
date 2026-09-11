@@ -71,7 +71,8 @@ async function enhanceConversation(localMessages,userMessage,previous){
   const context=new ContextAssembler().assemble(S,now(),userMessage),result=await remoteAI.generate(remoteRequest(S,userMessage,targets[0].speaker,context,plan));
   if(turn!==remoteTurn||!S.settings.remoteAI)return;
   latency.mark('remote_first_response_at');latency.mark('remote_response_completed_at');
-  const next=app.acceptRemoteTurn(targets.map(m=>m.id),result.messages??[{text:result.text,emotion:result.emotion}]);
+  const remote=result.messages??[{text:result.text,emotion:result.emotion}],filled=targets.map((local,index)=>remote[index]??{speaker:local.speaker,text:local.text});
+  const next=app.acceptRemoteTurn(targets.map(m=>m.id),filled);
   const byId=new Map(next.messages.map(m=>[m.id,m])),batch=localMessages.map(m=>byId.get(m.id)??m);
   hideTyping();render();latency.mark('assistant_text_rendered_at');speakMessages(batch,previous);
  }catch{

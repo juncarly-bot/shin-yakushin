@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
 import {RemoteAIProvider,remoteRequest,validateTurn} from '../app/src/main/assets/remote-ai.js';
 import {createOpenAIReaction} from '../backend/openai-client.mjs';
 import {StudyApplication} from '../app/src/main/assets/platform.js';
@@ -64,6 +64,17 @@ test('accepting a group turn rewrites only dialogue and keeps Study Reward Bond 
  assert.deepEqual(after.sessions,before.sessions);assert.deepEqual(after.rewardLedger,before.rewardLedger);assert.deepEqual(after.affinityLedger,before.affinityLedger);assert.deepEqual(after.memories,before.memories);
  assert.equal(after.messages.find(m=>m.id===ids[0]).text,'リモートA');
  assert.equal(after.messages.find(m=>m.id===ids[1]).text,'リモートB');
+});
+
+test('a short legacy bundle only upgrades the bubbles the backend answered',()=>{
+ const ui=fs.readFileSync(new URL('../app/src/main/assets/ui.js',import.meta.url),'utf8');
+ assert.match(ui,/filled=targets\.map\(\(local,index\)=>remote\[index\]\?\?\{speaker:local\.speaker,text:local\.text\}\)/);
+ const app=new StudyApplication(new Host(fresh()),()=>1700000000000);app.load();app.command('chat',{text:'二人はどう思う？'});
+ const local=app.lastVoiceMessages.map(m=>({speaker:m.speaker,text:m.text})),ids=app.lastVoiceMessages.map(m=>m.id);
+ const remote=[{speaker:'SAYO',text:'リモートA',emotion:'pleased'}],filled=local.map((l,i)=>remote[i]??{speaker:l.speaker,text:l.text});
+ const after=app.acceptRemoteTurn(ids,filled);
+ assert.equal(after.messages.find(m=>m.id===ids[0]).text,'リモートA');
+ assert.equal(after.messages.find(m=>m.id===ids[1]).text,local[1].text,'the unanswered bubble keeps its local phrasing');
 });
 
 test('a stale group turn cannot overwrite a newer user message',()=>{
