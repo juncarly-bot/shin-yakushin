@@ -11,6 +11,14 @@ package = re.search(r"package: name='([^']+)' versionCode='([^']+)' versionName=
 assert package and package[1] == expected, 'Unexpected APK applicationId'
 assert "sdkVersion:'26'" in badging and "targetSdkVersion:'35'" in badging
 signature = subprocess.check_output([str(bt/'apksigner'), 'verify', '--verbose', str(apk)], text=True)
+certs = subprocess.check_output([str(bt/'apksigner'), 'verify', '--print-certs', str(apk)], text=True)
+cert_digest = re.search(r'Signer #1 certificate SHA-256 digest:\s*([0-9a-fA-F]+)', certs)
+assert cert_digest, 'No signer certificate SHA-256 digest in apksigner output'
+signing_cert = cert_digest.group(1).lower()
+cert_subject = re.search(r'Signer #1 certificate DN:\s*(.*)', certs)
+expected_cert = os.environ.get('EXPECTED_SIGNING_CERT_SHA256', '').strip().lower()
+if expected_cert:
+    assert signing_cert == expected_cert, 'APK was not signed by the pinned RC certificate'
 patterns = [rb'sk-[A-Za-z0-9_-]{20,}', rb'OPENAI_API_KEY', rb'api\.openai\.com', rb'Authorization: Bearer']
 with zipfile.ZipFile(apk) as z:
     for entry in z.infolist():
@@ -32,8 +40,11 @@ Path('APK-SHA256SUMS.txt').write_text(sha+'  '+str(apk)+'\n')
 metadata = {'applicationId':package[1], 'versionCode':package[2], 'versionName':package[3],
             'sha256':sha, 'size_bytes':apk.stat().st_size, 'secretScan':'NONE',
             'abis':['arm64-v8a','x86_64'], 'signatureVerified':True,
-            'deviceVoicePlayback':'NOT VERIFIED', 'commit':os.environ.get('GITHUB_SHA')}
+            'deviceVoicePlayback':'NOT VERIFIED', 'commit':os.environ.get('GITHUB_SHA'),
+            'signingCertSha256':signing_cert,
+            'signingCertSubject':cert_subject.group(1) if cert_subject else None,
+            'signingCertPinned':bool(expected_cert)}
 Path('APK-METADATA.json').write_text(json.dumps(metadata, indent=2)+'\n')
 Path('APK-BADGING.txt').write_text(badging)
-Path('APK-SIGNATURE.txt').write_text(signature)
+Path('APK-SIGNATURE.txt').write_text(signature + '\n' + certs)
 print(json.dumps(metadata, indent=2))

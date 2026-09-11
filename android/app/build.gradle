@@ -1,4 +1,14 @@
 plugins { id 'com.android.application' }
+
+// Persistent preview/RC signing. The keystore and its passwords only ever live in
+// GitHub Secrets and are decoded into $RUNNER_TEMP at build time; nothing here is
+// committed. Without those secrets (fork or plain local build) the build falls back
+// to the throwaway debug key so the project still assembles.
+def rcKeystorePath = System.getenv('RC_KEYSTORE_FILE')
+def rcStorePassword = System.getenv('RC_STORE_PASSWORD')
+def rcKeyAlias = System.getenv('RC_KEY_ALIAS')
+def rcKeyPassword = System.getenv('RC_KEY_PASSWORD')
+def rcSigning = rcKeystorePath && rcStorePassword && rcKeyAlias && rcKeyPassword && file(rcKeystorePath).exists()
 android {
     namespace 'org.shinyakushin.study.next'
     compileSdk 35
@@ -10,14 +20,31 @@ android {
         externalNativeBuild { cmake { arguments '-DANDROID_STL=c++_shared', '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON' } }
         ndk { abiFilters 'arm64-v8a', 'x86_64' }
         targetSdk 35
-        versionCode 7
-        versionName '0.7.0-preview'
+        versionCode 8
+        versionName '0.8.0-rc1'
     }
     externalNativeBuild { cmake { path file('src/main/cpp/CMakeLists.txt'); version '3.22.1' } }
     packaging { jniLibs { useLegacyPackaging = true } }
     androidResources { noCompress += ['vvm'] }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
-    buildTypes { release { minifyEnabled false } }
+    signingConfigs {
+        if (rcSigning) {
+            rc {
+                storeFile file(rcKeystorePath)
+                storePassword rcStorePassword
+                keyAlias rcKeyAlias
+                keyPassword rcKeyPassword
+                // v1 keeps the certificate readable by keytool on the QA host;
+                // v2/v3 keep modern verification happy.
+                v1SigningEnabled true
+                v2SigningEnabled true
+            }
+        }
+    }
+    buildTypes {
+        debug { if (rcSigning) signingConfig signingConfigs.rc }
+        release { minifyEnabled false; if (rcSigning) signingConfig signingConfigs.rc }
+    }
 }
 
 dependencies {

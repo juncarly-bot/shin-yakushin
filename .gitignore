@@ -4,3 +4,10 @@ node_modules/
 .env.*
 .dev.vars
 .dev.vars.*
+*.jks
+*.keystore
+*.p12
+*.pfx
+*keystore*.b64
+keystore.properties
+signing.properties

@@ -105,6 +105,30 @@ jobs:
           python3 tools/verify_voice_bundle.py
           sha256sum -c SHA256SUMS-VOICEVOX-v07.txt
 
+      - name: Configure persistent preview signing
+        if: ${{ secrets.RC_KEYSTORE_BASE64 != '' }}
+        shell: bash
+        env:
+          RC_KEYSTORE_BASE64: ${{ secrets.RC_KEYSTORE_BASE64 }}
+          RC_STORE_PASSWORD: ${{ secrets.RC_STORE_PASSWORD }}
+          RC_KEY_ALIAS: ${{ secrets.RC_KEY_ALIAS }}
+          RC_KEY_PASSWORD: ${{ secrets.RC_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keystore="$RUNNER_TEMP/shin-yakushin-rc.p12"
+          printf '%s' "$RC_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          chmod 600 "$keystore"
+          test -s "$keystore"
+          # The RC certificate fingerprint is public information and is pinned so
+          # verify_apk.py can prove the APK was signed by the persistent RC key.
+          {
+            echo "RC_KEYSTORE_FILE=$keystore"
+            echo "RC_STORE_PASSWORD=$RC_STORE_PASSWORD"
+            echo "RC_KEY_ALIAS=$RC_KEY_ALIAS"
+            echo "RC_KEY_PASSWORD=$RC_KEY_PASSWORD"
+            echo "EXPECTED_SIGNING_CERT_SHA256=082513b4015567c3db6d721f19d31de11a44edb5a19ee47de8b5e71e2b92ef6e"
+          } >> "$GITHUB_ENV"
+
       - name: Clean
         run: ./gradlew --no-daemon clean
 
