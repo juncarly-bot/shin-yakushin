@@ -60,6 +60,13 @@ test('local SAYO lines stay casual rather than coach-like',()=>{
  for(const casual of ['じゃ終わろ終わろ','やるなら15分だけやろー','お、今日は早いじゃん'])assert.ok(source.includes(casual),casual);
 });
 
+test('core conversation and initiative decisions stay deterministic',()=>{
+ for(const file of ['orchestrator.js','initiative.js','commitments.js','conversation.js','timeline.js']){
+  const source=readFileSync(new URL('../app/src/main/assets/'+file,import.meta.url),'utf8').replace(/\/\*[\s\S]*?\*\//g,'').replace(/\/\/[^\n]*/g,'');
+  assert.doesNotMatch(source,/Math\.random/,`${file} must not use randomness`);
+ }
+});
+
 test('conversationPlan never returns an unbounded plan',()=>{
  const allowed=new Set(Object.values(ConversationPlan));
  const {app}=setup();
