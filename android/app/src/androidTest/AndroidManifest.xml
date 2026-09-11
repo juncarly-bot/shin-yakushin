@@ -2,4 +2,9 @@
     <instrumentation android:name="org.shinyakushin.study.next.PersistenceQa"
         android:targetPackage="org.shinyakushin.study.next.v07.preview"
         android:functionalTest="true" />
+    <!-- Migration rehearsal reader tests. Same APK, a second entry point so the
+         persistence run stays untouched. -->
+    <instrumentation android:name="org.shinyakushin.study.next.MigrationQa"
+        android:targetPackage="org.shinyakushin.study.next.v07.preview"
+        android:functionalTest="true" />
 </manifest>

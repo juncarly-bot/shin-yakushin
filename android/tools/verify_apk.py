@@ -4,6 +4,10 @@ from pathlib import Path
 
 apk = Path(sys.argv[1])
 expected = sys.argv[2]
+# The default build keeps the historical APK-* names; the migration QA variant sets
+# APK_LABEL so its evidence never overwrites the preview/RC evidence.
+label = os.environ.get('APK_LABEL', '').strip()
+stem = 'APK-' + label if label else 'APK-'
 sdk = Path(os.environ.get('ANDROID_HOME') or os.environ['ANDROID_SDK_ROOT'])
 bt = sdk / 'build-tools/35.0.0'
 badging = subprocess.check_output([str(bt/'aapt'), 'dump', 'badging', str(apk)], text=True)
@@ -36,15 +40,15 @@ with zipfile.ZipFile(apk) as z:
         if name.endswith('.vvm') or name.startswith('dict/'):
             assert hashlib.sha256(z.read('assets/voicevox/'+name)).hexdigest() == sha, name
 sha = hashlib.sha256(apk.read_bytes()).hexdigest()
-Path('APK-SHA256SUMS.txt').write_text(sha+'  '+str(apk)+'\n')
+Path(stem+'SHA256SUMS.txt').write_text(sha+'  '+str(apk)+'\n')
 metadata = {'applicationId':package[1], 'versionCode':package[2], 'versionName':package[3],
             'sha256':sha, 'size_bytes':apk.stat().st_size, 'secretScan':'NONE',
             'abis':['arm64-v8a','x86_64'], 'signatureVerified':True,
             'deviceVoicePlayback':'NOT VERIFIED', 'commit':os.environ.get('GITHUB_SHA'),
             'signingCertSha256':signing_cert,
             'signingCertSubject':cert_subject.group(1) if cert_subject else None,
-            'signingCertPinned':bool(expected_cert)}
-Path('APK-METADATA.json').write_text(json.dumps(metadata, indent=2)+'\n')
-Path('APK-BADGING.txt').write_text(badging)
-Path('APK-SIGNATURE.txt').write_text(signature + '\n' + certs)
+            'signingCertPinned':bool(expected_cert), 'label':label or 'default'}
+Path(stem+'METADATA.json').write_text(json.dumps(metadata, indent=2)+'\n')
+Path(stem+'BADGING.txt').write_text(badging)
+Path(stem+'SIGNATURE.txt').write_text(signature + '\n' + certs)
 print(json.dumps(metadata, indent=2))

@@ -178,6 +178,29 @@ jobs:
           if-no-files-found: error
           path: android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 
+      - name: Assemble migration QA APK
+        run: ./gradlew --no-daemon assembleMigrationqa
+
+      - name: Migration QA APK metadata and secret scan
+        shell: bash
+        env:
+          APK_LABEL: migrationqa-
+        run: |
+          set -euo pipefail
+          python3 tools/verify_apk.py app/build/outputs/apk/migrationqa/app-migrationqa.apk org.shinyakushin.study.next.v08.migrationqa
+
+      - name: Upload migration QA APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shin-yakushin-v08-migrationqa-debug
+          if-no-files-found: error
+          path: |
+            android/app/build/outputs/apk/migrationqa/app-migrationqa.apk
+            android/APK-migrationqa-SHA256SUMS.txt
+            android/APK-migrationqa-METADATA.json
+            android/APK-migrationqa-BADGING.txt
+            android/APK-migrationqa-SIGNATURE.txt
+
   persistence:
     needs: build
     runs-on: ubuntu-24.04
@@ -202,6 +225,11 @@ jobs:
         with:
           name: shin-yakushin-v08-persistence-test-apk
           path: android/app/build/outputs/apk/androidTest/debug
+      - name: Download migration QA APK
+        uses: actions/download-artifact@v4
+        with:
+          name: shin-yakushin-v08-migrationqa-debug
+          path: android
       - name: Real Android persistence regression
         timeout-minutes: 25
         shell: bash
@@ -284,6 +312,31 @@ jobs:
           adb -s emulator-5554 shell run-as org.shinyakushin.study.next.v07.preview find . -name "study.sqlite3*" | tee app-state-files.txt || true
           python3 tools/check_emulator_startup.py | tee app-startup.txt
 
+          # Migration rehearsal: the QA build has its own applicationId, so it installs
+          # next to the preview app. Installing it must not disturb the preview package
+          # or its data, and the QA process must survive its own startup.
+          adb -s emulator-5554 install -r -t app/build/outputs/apk/migrationqa/app-migrationqa.apk
+          adb -s emulator-5554 shell pm list packages | tee packages-after-migration-qa-install.txt
+          grep -q "package:org.shinyakushin.study.next.v07.preview" packages-after-migration-qa-install.txt
+          grep -q "package:org.shinyakushin.study.next.v08.migrationqa" packages-after-migration-qa-install.txt
+          adb -s emulator-5554 logcat -c || true
+          adb -s emulator-5554 shell am start -n org.shinyakushin.study.next.v08.migrationqa/org.shinyakushin.study.next.MainActivity | tee migration-qa-start.txt
+          sleep 8
+          adb -s emulator-5554 shell pidof org.shinyakushin.study.next.v08.migrationqa | tee migration-qa-pid.txt || true
+          if [ ! -s migration-qa-pid.txt ]; then
+            adb -s emulator-5554 shell ps -A | grep -F org.shinyakushin.study.next.v08.migrationqa | tee migration-qa-pid.txt
+          fi
+          test -s migration-qa-pid.txt
+          adb -s emulator-5554 logcat -d -v brief | tee migration-qa-logcat.txt
+          if grep -E "FATAL EXCEPTION|Process: org\.shinyakushin\.study\.next\.v08\.migrationqa.*died" migration-qa-logcat.txt; then
+            echo "::error::the migration QA app crashed during startup"
+            exit 1
+          fi
+          # The native read-only reader is exercised on the device by its own instrumentation.
+          adb -s emulator-5554 shell am instrument -w org.shinyakushin.study.next.v07.preview.test/org.shinyakushin.study.next.MigrationQa | tee migration-qa-instrument.txt
+          grep -q "MIGRATION_QA passed=7 failed=0" migration-qa-instrument.txt
+          adb -s emulator-5554 shell run-as org.shinyakushin.study.next.v07.preview ls -la files | tee app-files-after-migration-qa.txt || true
+
       - name: Upload persistence evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -305,3 +358,9 @@ jobs:
             android/app-startup.png
             android/app-startup-crash.log
             android/app-startup-logcat.txt
+            android/packages-after-migration-qa-install.txt
+            android/migration-qa-start.txt
+            android/migration-qa-pid.txt
+            android/migration-qa-logcat.txt
+            android/migration-qa-instrument.txt
+            android/app-files-after-migration-qa.txt

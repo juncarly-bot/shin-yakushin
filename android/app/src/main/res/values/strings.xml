@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Preview app name. The migration QA build type overrides this so both apps are
+         distinguishable in the launcher while they are installed side by side. -->
+    <string name="app_name">新躍進政策・学習</string>
+</resources>

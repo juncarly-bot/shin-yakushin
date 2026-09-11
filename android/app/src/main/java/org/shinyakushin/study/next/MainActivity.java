@@ -17,7 +17,7 @@ import java.util.concurrent.*;
 
 public final class MainActivity extends Activity {
     private static final String ORIGIN="https://appassets.androidplatform.net";
-    private static final int EXPORT=20,IMPORT=21,NOTIFICATIONS=22;
+    private static final int EXPORT=20,IMPORT=21,NOTIFICATIONS=22,MIGRATION=23;
     private WebView web;
     private StateStore store;
     private VoiceController voice;
@@ -37,7 +37,7 @@ public final class MainActivity extends Activity {
             @Override public boolean shouldOverrideUrlLoading(WebView w,WebResourceRequest r){return true;}
             @Override public void onPageFinished(WebView w,String url){webReady=true;String queued=pendingIntervention;pendingIntervention=null;if(queued!=null)dispatchIntervention(queued);}
             @Override public WebResourceResponse shouldInterceptRequest(WebView w,WebResourceRequest req){
-                Uri u=req.getUrl();String path=u.getPath();Set<String> allowed=new HashSet<>(Arrays.asList("/index.html","/ui.js","/domain.js","/reactions.js","/templates.js","/platform.js","/style.css","/avatar-sheet.png","/timeline.js","/orchestrator.js","/conversation.js","/conversation-shape.js","/characters.js","/companion.js","/voice-settings.js","/remote-ai.js","/life-balance.js","/life-balance-analytics.js","/life-balance-compat.js"));
+                Uri u=req.getUrl();String path=u.getPath();Set<String> allowed=new HashSet<>(Arrays.asList("/index.html","/ui.js","/domain.js","/reactions.js","/templates.js","/platform.js","/style.css","/avatar-sheet.png","/timeline.js","/orchestrator.js","/conversation.js","/conversation-shape.js","/characters.js","/companion.js","/voice-settings.js","/remote-ai.js","/life-balance.js","/life-balance-analytics.js","/life-balance-compat.js","/migration-verify.js"));
                 if(!"https".equals(u.getScheme())||!"appassets.androidplatform.net".equals(u.getHost())||!allowed.contains(path))return response("text/plain",404,"Not found",new ByteArrayInputStream(new byte[0]));
                 try{return response(path.endsWith(".js")?"text/javascript":path.endsWith(".css")?"text/css":path.endsWith(".png")?"image/png":"text/html",200,"OK",getAssets().open(path.substring(1)));}catch(IOException ex){return response("text/plain",404,"Not found",new ByteArrayInputStream(new byte[0]));}
             }
@@ -97,6 +97,10 @@ public final class MainActivity extends Activity {
             String catalog=LaunchableApps.read(MainActivity.this);
             runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformLaunchableApps && window.platformLaunchableApps("+JSONObject.quote(catalog)+")",null);});
         });}
+        /** Migration rehearsal build only: the rehearsal package is never the preview id. */
+        @JavascriptInterface public boolean migrationQaEnabled(){return getPackageName().endsWith(".migrationqa");}
+        /** Migration rehearsal build only: import a tools/backup_app_state.sh artifact read-only. */
+        @JavascriptInterface public void importMigrationSource(){runOnUiThread(()->{try{Intent i=new Intent(Intent.ACTION_GET_CONTENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,MIGRATION);}catch(RuntimeException ex){message("移行元を選ぶ画面を開けませんでした。");}});}
         @JavascriptInterface public void openUsageAccessSettings(){runOnUiThread(()->{try{startActivity(appUsage.usageAccessIntent());}catch(RuntimeException ex){message("使用状況へのアクセス設定を開けませんでした。");}});}
     }
     /** Minimal notification payload only; raw Usage events never enter the Intent. */
@@ -118,6 +122,16 @@ public final class MainActivity extends Activity {
     @Override public void onActivityResult(int request,int resultCode,Intent data){super.onActivityResult(request,resultCode,data);if(resultCode!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();io.execute(()->{try{
         if(request==EXPORT){String raw=store.read();if(raw==null)throw new IOException("書き出す記録がありません");try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("ファイルを開けません");out.write(raw.getBytes(StandardCharsets.UTF_8));out.flush();}message("バックアップを書き出しました。");}
         else if(request==IMPORT){String raw;try(InputStream in=getContentResolver().openInputStream(uri);ByteArrayOutputStream out=new ByteArrayOutputStream()){if(in==null)throw new IOException("ファイルを開けません");byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1){if(out.size()+n>25_000_000)throw new IOException("25 MB以下のファイルを選んでください");out.write(buffer,0,n);}raw=out.toString("UTF-8");}store.preserveImport(raw);final String imported=raw;runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformImportCandidate && window.platformImportCandidate("+JSONObject.quote(imported)+")",null);});}
+        // Rehearsal path: the picked artifact is copied into cache, read without ever being
+        // opened for writing, and the extracted JSON is preserved as an immutable import
+        // source. Nothing is committed, so a failed rehearsal leaves both the picked file
+        // and the currently installed app's state untouched.
+        else if(request==MIGRATION){File staged=new File(getCacheDir(),"migration-qa-input-"+System.currentTimeMillis()+".bin");try{
+            try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(staged)){if(in==null)throw new IOException("ファイルを開けません");byte[] buffer=new byte[8192];int n;long total=0;while((n=in.read(buffer))!=-1){total+=n;if(total>MigrationSource.MAX_BYTES)throw new IOException("25 MB以下のファイルを選んでください");out.write(buffer,0,n);}}
+            MigrationSource.Result source=MigrationSource.read(staged,getCacheDir());store.preserveImport(source.json);
+            final String payload=source.json;final String meta=new JSONObject().put("format",source.format).put("sha256",source.sha256).put("bytes",source.bytes).put("name",source.name).toString();
+            runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.platformMigrationQaSource && window.platformMigrationQaSource("+JSONObject.quote(payload)+","+JSONObject.quote(meta)+")",null);});
+        }finally{staged.delete();}}
     }catch(Exception ex){message("ファイル操作を完了できませんでした："+ex.getMessage());}});}
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(request==NOTIFICATIONS){BreakReceiver.schedule(this,store.read());message(BreakReceiver.permitted(this)?"休憩終了通知を許可しました。":"通知はオフです。学習・休憩はそのまま使えます。");}}
     @Override protected void onPause(){if(voice!=null)voice.foreground(false);if(web!=null){web.onPause();web.pauseTimers();}super.onPause();}

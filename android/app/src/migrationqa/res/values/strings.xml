@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Migration rehearsal only: never shipped as the preview/RC applicationId. -->
+    <string name="app_name">新躍進政策・移行QA</string>
+</resources>

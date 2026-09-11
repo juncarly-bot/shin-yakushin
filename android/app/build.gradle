@@ -43,7 +43,25 @@ android {
     }
     buildTypes {
         debug { if (rcSigning) signingConfig signingConfigs.rc }
+        // Migration rehearsal only: a side-by-side installable build used to prove an
+        // existing install's saved state migrates before that install is replaced.
+        // It reuses the debug type (debuggable, same signing) but the applicationId is
+        // overridden below so it can never collide with the preview app or its data.
+        migrationqa {
+            initWith debug
+            if (rcSigning) signingConfig signingConfigs.rc
+            versionNameSuffix '-migrationqa'
+        }
         release { minifyEnabled false; if (rcSigning) signingConfig signingConfigs.rc }
+    }
+}
+
+// Keep the preview applicationId exactly as-is for the normal debug/release builds and
+// give only the rehearsal variant its own package. Changing the id in defaultConfig (or
+// an applicationIdSuffix) would either move the real app or produce the wrong package.
+androidComponents {
+    onVariants(selector().withBuildType('migrationqa')) { variant ->
+        variant.applicationId.set('org.shinyakushin.study.next.v08.migrationqa')
     }
 }
 
