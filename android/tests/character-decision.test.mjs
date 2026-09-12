@@ -2,6 +2,9 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {CharacterProfiles,CHARACTER_IDS,profileFor,displayName} from '../app/src/main/assets/characters.js';
 import {ConversationMode,conversationMode,perceive,decide,decideBoth,decisionsDiffer} from '../app/src/main/assets/character-decision.js';
 import {StudyApplication} from '../app/src/main/assets/platform.js';
+import {evaluate} from '../app/src/main/assets/initiative.js';
+import {castPlan} from '../app/src/main/assets/cast-director.js';
+import {dateKey} from '../app/src/main/assets/domain.js';
 const T=Date.parse('2026-09-11T03:00:00Z'),DAY=86400000;
 class Host{raw=null;read(){return JSON.stringify({ok:true,raw:this.raw})}commit(rev,raw){this.raw=raw;return this.read()}}
 const base={text:'',event:null,mode:'CASUAL',activeStudy:false,activeMinutes:0,studyMinutes:0,goalMinutes:0,goalNear:false,goalReached:false,lastMinutes:0,last:null,lateNight:false,fatigue:false,sleepy:false,planning:false,review:false,stuck:false,postpone:false,studyDays:0,offset:540,now:T,thread:null,commitment:null,topic:''};
@@ -87,4 +90,29 @@ test('conversation modes cover casual turns without forcing a Study CTA',()=>{
  assert.equal(conversationMode({...base,commitment:{commitmentId:'c'}}),ConversationMode.COMMITMENT_FOLLOWUP);
  assert.equal(conversationMode({...base,activeStudy:true}),ConversationMode.STUDY_CONTINUATION);
  assert.equal(conversationMode({...base,event:'finish'}),ConversationMode.POST_STUDY);
+});
+
+test('the companions can deliberately stay quiet',()=>{
+ assert.equal(CharacterProfiles.SAYO.silencePreference,'comfortable');
+ assert.equal(CharacterProfiles.NurseT.silencePreference,'speaks-only-with-value');
+ const host=new Host();let now=T;const app=new StudyApplication(host,()=>now);app.load();
+ const today=dateKey(T,app.state.settings.utcOffsetMinutes);
+ // A quiet day is an explicit decision to say nothing at all.
+ app.state.settings.companion.quietDay=today;
+ assert.equal(evaluate(app.state,T),null);
+ app.state.settings.companion.quietDay=null;
+ // A live session is never interrupted with chatter.
+ app.clock=()=>T;app.command('start',{sessionId:'live',title:'本'});
+ app.clock=()=>T+30*60000;
+ assert.equal(evaluate(app.state,T+30*60000),null);
+ // LOW proactivity stops after its budget.
+ app.state.settings.companion.proactivity='LOW';
+ app.state.initiative={...app.state.initiative,shownDay:today,shownCount:2};
+ app.clock=()=>T+31*60000;
+ assert.equal(evaluate(app.state,T+31*60000),null);
+ // Snoozing is respected, and a plain casual turn stays a single voice.
+ app.state.initiative={...app.state.initiative,shownDay:null,shownCount:0,snoozeUntil:T+3600000};
+ assert.equal(evaluate(app.state,T+31*60000),null);
+ const plan=castPlan({...base,mode:'CASUAL'},{});
+ assert.equal(plan.order.length,1);
 });
