@@ -23,7 +23,9 @@ export function openThread(s,fields,now){
  const topic=clip(fields.topic,80);
  if(!topic)return null;
  s.openThreads??=[];
- const id=fields.id?clip(fields.id,120):`thread:${clip(fields.topic,40)}:${now}`;
+ // Identity is the topic itself: re-mentioning the same unresolved subject
+ // updates the existing thread instead of stacking a new one.
+ const id=fields.id?clip(fields.id,120):`thread:${topic}`;
  const existing=s.openThreads.find(t=>t.id===id);
  if(existing){existing.updatedAt=now;existing.lastTouchedAt=now;return existing}
  const thread={id,topic,summary:clip(fields.summary??topic,200),createdAt:now,updatedAt:now,lastTouchedAt:now,

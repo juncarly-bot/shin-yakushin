@@ -25,9 +25,13 @@ export function recentStructures(s,limit=STRUCTURE_LIMIT){
  return out.slice(-limit);
 }
 
+/**
+ * A genuinely different interaction, not a synonym swap: shorten a group turn,
+ * let the lead speak alone, or invite the other companion once.
+ */
 function alternativeOrder(order){
- if(order.length>=3)return order.slice(0,2);
- if(order.length===2)return [order[0]];
+ if(order.length>=3)return order.slice(0,-1);
+ if(order.length===2)return order.slice(0,1);
  const other=order[0]==='SAYO'?'NurseT':'SAYO';
  return [order[0],other];
 }
@@ -40,9 +44,11 @@ export function guardStructure(s,candidate,recent=recentStructures(s)){
  const base={mode:'CASUAL',order:[],question:false,cta:false,...candidate};
  const key=structureKey(base),last=recent.at(-1);
  if(!last||last.structure!==key)return {...base,key,adjusted:false,reason:null};
- if(base.question)return {...base,question:false,key:structureKey({...base,question:false}),adjusted:true,reason:'observation-instead-of-question'};
- if(base.cta)return {...base,cta:false,key:structureKey({...base,cta:false}),adjusted:true,reason:'no-cta-this-time'};
+ // The shape repeated: the speaker sequence is the strongest local lever.
  const order=alternativeOrder(base.order);
  const next={...base,order,key:structureKey({...base,order})};
- return {...next,adjusted:true,reason:'changed-speaker-sequence'};
+ if(next.key!==key)return {...next,adjusted:true,reason:'changed-speaker-sequence'};
+ if(base.question)return {...base,question:false,key:structureKey({...base,question:false}),adjusted:true,reason:'observation-instead-of-question'};
+ if(base.cta)return {...base,cta:false,key:structureKey({...base,cta:false}),adjusted:true,reason:'no-cta-this-time'};
+ return {...base,key,adjusted:true,reason:'same-structure'};
 }

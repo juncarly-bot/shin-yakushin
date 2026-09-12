@@ -45,6 +45,8 @@ export function directAddress(text){
 }
 
 const CTA=/やる|始め|続き|休憩|振り返|決め|おわり|終わ/;
+/** Recommendation kinds that turn a turn into an action-oriented interaction. */
+const CTA_KINDS=['START','CONTINUE','PLAN_NEXT','BREAK','REVIEW'];
 const isQuestion=text=>/[？?]\s*$/.test(String(text??'').trim());
 
 function recentSpeakers(s,limit=8){
@@ -62,7 +64,9 @@ function liveProposalParts(s){
 function useLead(situation,decision,reaction){
  if(!reaction?.text)return false;
  const explicit=['finish','start','resume','break','goal','progress','material','dailyReview','weeklyReview','recall','milestone','exceeded','half','commitment','initiative'].includes(reaction.event);
- const neutral=['CHAT','NONE','REST'].includes(decision?.recommendation?.kind);
+ // A rest/sleep decision has its own character line: never let a generic
+ // reply stand in for what the character actually decided.
+ const neutral=['CHAT','NONE'].includes(decision?.recommendation?.kind);
  return explicit||neutral;
 }
 
@@ -86,13 +90,16 @@ export function orchestrateConversation(s,event,resolution,now){
  if(cast.plan===ConversationPlan.NONE)return [];
  const decisions=decideBoth(situation);
  let order=cast.order;
+ // The structure is derived from the decisions, not from the incidental wording,
+ // so the guard compares real interaction shapes across turns and restarts.
  const question=isQuestion(s.reaction.text);
- const guarded=guardStructure(s,{mode:situation.mode,order,question,cta:CTA.test(s.reaction.text)});
- if(guarded.adjusted&&guarded.order.length===order.length)order=guarded.order;
+ const cta=order=>order.some(id=>CTA_KINDS.includes(decisions[id].recommendation.kind));
+ const guarded=guardStructure(s,{mode:situation.mode,order,question,cta:cta(order)});
+ if(guarded.adjusted&&guarded.order.length>=1&&guarded.order.length<=3)order=guarded.order;
  const relationship={stage:relationshipStage(metrics(s,now)),voice:relationshipVoice(relationshipStage(metrics(s,now)))};
  const lead=s.reaction.speaker===order[0]&&useLead(situation,decisions[order[0]],s.reaction)?{speaker:order[0],text:s.reaction.text}:null;
  const messages=composeDialogue(s,{order,situation,decisions,now,lead,relationship});
- const structure=structureKey({mode:situation.mode,order,question,cta:messages.some(m=>CTA.test(m.text))});
+ const structure=structureKey({mode:situation.mode,order,question,cta:cta(order)});
  return messages.map(message=>({speaker:message.speaker,text:message.text,emotion:message.emotion,structure,relationshipStage:relationship.stage}));
 }
 

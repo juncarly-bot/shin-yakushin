@@ -32,7 +32,7 @@ const REPROMPT_GAP=30*MINUTE;
 const proposal=(fields)=>({id:fields.id,kind:fields.kind,createdAt:fields.createdAt,speakerPlan:fields.speakerPlan??['SAYO'],reason:fields.reason,title:fields.title,
  messageHint:fields.messageHint??null,messages:fields.messages??[],actionOptions:fields.actionOptions??[],
  relatedMaterialId:fields.relatedMaterialId??null,relatedTaskId:fields.relatedTaskId??null,relatedGoalId:fields.relatedGoalId??null,
- relatedPlanId:fields.relatedPlanId??null,commitmentId:fields.commitmentId??null,expiresAt:fields.expiresAt,priority:fields.priority});
+ relatedPlanId:fields.relatedPlanId??null,commitmentId:fields.commitmentId??null,threadId:fields.threadId??null,returnId:fields.returnId??null,expiresAt:fields.expiresAt,priority:fields.priority});
 
 export function proactivityOf(s){const level=s.settings?.companion?.proactivity;return PROACTIVITY_LEVELS.includes(level)?level:'NORMAL'}
 

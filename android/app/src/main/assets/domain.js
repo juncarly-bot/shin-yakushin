@@ -39,8 +39,8 @@ export function metrics(s,now){let seconds=0,reward=0;const days=new Set();for(c
 export function validate(s,allowedVersion=VERSION){
  validateConversation(s.conversation,s);
  // Additive companion-continuity fields: old saves load with safe defaults.
- for(const key of ['sharedMemories','openThreads','returnQueue'])if(s[key]===undefined)s[key]=[];
- if(s.characterMemories===undefined||typeof s.characterMemories!=='object'||Array.isArray(s.characterMemories))s.characterMemories={SAYO:[],NurseT:[]};
+ for(const key of ['sharedMemories','openThreads','returnQueue'])if(s[key]===undefined||s[key]===null)s[key]=[];
+ if(s.characterMemories===undefined||s.characterMemories===null||typeof s.characterMemories!=='object'||Array.isArray(s.characterMemories))s.characterMemories={SAYO:[],NurseT:[]};
  else{for(const who of ['SAYO','NurseT'])if(!Array.isArray(s.characterMemories[who]))s.characterMemories[who]=[];}
  for(const key of ['sharedMemories','openThreads','returnQueue'])for(const item of s[key]){object(item);str(item.id,200);num(item.createdAt??item.timestamp??0)}
  for(const who of ['SAYO','NurseT'])for(const item of s.characterMemories[who]){object(item);str(item.id,200);str(item.text,200);num(item.timestamp??0)}

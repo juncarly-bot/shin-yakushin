@@ -70,6 +70,7 @@ export function nextMorning(now,offset){
 export function returnMessages(item){
  const speaker=item.speakerPreference==='SAYO'?'SAYO':'NurseT',other=speaker==='SAYO'?'NurseT':'SAYO';
  const first=speaker==='SAYO'?`昨日、${item.summary}`:`昨日は${item.summary}。`;
- const second=speaker==='SAYO'?'気になってた。':'記録に残っています。';
+ // The second line is a reaction to the first, never a second summary of it.
+ const second=speaker==='SAYO'?'うん、なんかそうだったよね。':'うん、なんかそんな感じだった。';
  return [{speaker,text:first},{speaker:other,text:second}];
 }

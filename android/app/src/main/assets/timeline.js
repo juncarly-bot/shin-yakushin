@@ -30,7 +30,7 @@ export function appendTimeline(s,previous,event,now,resolution){
  if(event==='finish'){const x=s.sessions.find(x=>x.endTimestamp===now);if(x)push({id:'study:'+x.sessionId,speaker:'event',sessionId:x.sessionId,text:'',at:now});}
  const added=[];
  if(s.reaction&&s.reaction.timestamp===now&&(s.reaction.timestamp!==previous.reaction?.timestamp||resolution))for(const [index,message] of orchestrateConversation(s,event,resolution,now).entries()){
-  const item={id:crypto.randomUUID(),speaker:message.speaker,text:message.text,at:now+index,intent:resolution?.intent||event||'reaction',target:index===0&&resolution?.topic?{kind:resolution.topic.kind,id:resolution.topic.item.id}:null};
+  const item={id:crypto.randomUUID(),speaker:message.speaker,text:message.text,at:now+index,structure:message.structure,relationshipStage:message.relationshipStage,intent:resolution?.intent||event||'reaction',target:index===0&&resolution?.topic?{kind:resolution.topic.kind,id:resolution.topic.item.id}:null};
   push(item);added.push(item);
  }
  if(added.length){const c=stateOf(s,now),last=added.at(-1);for(const m of added.slice(1))c.turns.push({speaker:m.speaker,text:m.text,at:m.at});c.turns=c.turns.slice(-6);c.lastSpeaker=last.speaker;c.recentReaction=last.text.slice(0,300);c.lastInteractionAt=now;s.conversation=c;}
