@@ -354,6 +354,7 @@ jobs:
             android/emulator-persistence.log
             android/accel-check.txt
             android/app-startup.txt
+            android/startup-metrics.json
             android/app-startup-ui.xml
             android/app-startup.png
             android/app-startup-crash.log

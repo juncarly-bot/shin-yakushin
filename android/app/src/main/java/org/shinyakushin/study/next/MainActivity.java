@@ -30,6 +30,7 @@ public final class MainActivity extends Activity {
     private final CountDownLatch storeReady=new CountDownLatch(1);
     private volatile Exception storeFailure=null;
     private long processStart=0;
+    private final Map<String,Long> startupMeasurements=Collections.synchronizedMap(new LinkedHashMap<>());
     private boolean startupLog=false;
     private boolean webReady=false;
     private String pendingIntervention=null,pendingCommitment=null;
@@ -68,6 +69,7 @@ public final class MainActivity extends Activity {
     private void startupMark(String name){
         if(!startupLog||!STARTUP_MARKS.contains(name))return;
         long elapsed=Math.max(0,SystemClock.uptimeMillis()-processStart);
+        synchronized(startupMeasurements){if(!startupMeasurements.containsKey(name))startupMeasurements.put(name,elapsed);}
         android.util.Log.i(STARTUP_TAG,"STARTUP_MARK "+name+" "+elapsed+"ms");
         // The headline metric is time to usable chat, not the time until every
         // advisory subsystem (VOICE, Memory, Usage, Continuity) has finished.
@@ -130,6 +132,18 @@ public final class MainActivity extends Activity {
         /** Debug builds only: the release APK reports false, so no QA trigger is exposed. */
         /** Debug builds only: mirrors the JS startup marks into logcat with a process-start epoch. */
         @JavascriptInterface public void debugMark(String name){startupMark(name);}
+        @JavascriptInterface public String startupMeasurements(){
+    if(!startupLog)return "{}";
+    try{
+        JSONObject result=new JSONObject(),marks=new JSONObject();Long usable;
+        synchronized(startupMeasurements){
+            for(Map.Entry<String,Long> entry:startupMeasurements.entrySet())marks.put(entry.getKey(),entry.getValue());
+            usable=startupMeasurements.get("composer_interactive");
+        }
+        result.put("marks",marks);result.put("timeToUsableChatMs",usable==null?JSONObject.NULL:usable);
+        return result.toString();
+    }catch(JSONException impossible){return "{}";}
+}
         @JavascriptInterface public boolean debugToolsEnabled(){
             return (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0;
         }

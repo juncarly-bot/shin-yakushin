@@ -2,12 +2,15 @@
 import os
 import subprocess
 import time
+import json
+import re
 from pathlib import Path
 
 if os.environ.get('GITHUB_ACTIONS') != 'true':
     raise SystemExit('This check only runs on the disposable GitHub CI emulator')
 
 EMULATOR = ('adb', '-s', 'emulator-5554')
+METRICS = []
 
 def adb(*args, timeout=60):
     return subprocess.check_output([*EMULATOR, *args], timeout=timeout)
@@ -30,6 +33,10 @@ def assert_no_fatal_exception(label):
     pid = assert_process_alive(label)
     log = adb('logcat', '-d', '--pid=' + pid).decode(errors='replace')
     Path('app-startup-logcat.txt').write_text(log)
+    matches = re.findall(r'STARTUP_LATENCY timeToUsableChat (\d+)ms', log)
+    startup_ms = int(matches[-1]) if matches else None
+    METRICS.append({'label': label, 'timeToUsableChatMs': startup_ms})
+    print(label + ': timeToUsableChat=' + (str(startup_ms) + 'ms' if startup_ms is not None else 'not-observed'), flush=True)
     if 'FATAL EXCEPTION' in log:
         raise AssertionError(label + ': FATAL EXCEPTION in app logcat')
     crash = adb('logcat', '-d', '-b', 'crash').decode(errors='replace')
@@ -71,6 +78,7 @@ try:
     adb('shell', 'am', 'force-stop', package)
     launch_and_check('APP_RESTART_WITHOUT_CLEARING_DATA')
 finally:
+    Path('startup-metrics.json').write_text(json.dumps({'runs': METRICS}, ensure_ascii=False, indent=2))
     try:
         Path('app-startup.png').write_bytes(adb('exec-out', 'screencap', '-p'))
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired):

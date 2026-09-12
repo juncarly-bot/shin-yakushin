@@ -26,7 +26,7 @@ test('the second line is written from the first decision, not in parallel',()=>{
  const withChat=reaction({},'NurseT',own,afterChat,situation,T);
  assert.notEqual(withContinue,withChat,'the wording is derived from what the other companion actually decided');
  assert.match(withContinue,/一度に、ですか/);
- assert.match(withChat,/たしかに/);
+ assert.match(withChat,/そうですね/);
 });
 
 test('USER -> SAYO -> TT -> SAYO is one causal exchange (acceptance A)',()=>{
