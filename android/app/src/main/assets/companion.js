@@ -4,12 +4,37 @@ import {active,entity,metrics,report,dateKey,shiftDate} from './domain.js';
 import {LocalRulesProvider} from './reactions.js';
 import {CharacterProfiles,profileFor} from './templates.js';
 import {entertainmentBudget} from './life-balance.js';
+import {CharacterMemoryRouter} from './character-memory.js';
+import {selectThread} from './continuity.js';
+import {dueReturn} from './return-queue.js';
+import {relationshipStage,relationshipVoice} from './relationship.js';
 export {voiceSettings,voiceDefaults} from './voice-settings.js';
 import {voiceSettings} from './voice-settings.js';
 export function inQuietHours(v,now,offset){const h=new Date(now+offset*60000).getUTCHours();return v.quietHours&&(v.quietStart===v.quietEnd|| (v.quietStart<v.quietEnd?h>=v.quietStart&&h<v.quietEnd:h>=v.quietStart||h<v.quietEnd))}
 export function previousStudy(s){for(const x of [...s.sessions].filter(x=>x.endTimestamp!==null).sort((a,b)=>b.endTimestamp-a.endTimestamp)){const task=entity(s,'tasks',x.relatedTaskId),material=entity(s,'materials',x.relatedMaterialId);const target=task&&!task.archived&&!task.done?{kind:'tasks',item:task}:material&&!material.archived?{kind:'materials',item:material}:null;if(target)return {...target,material,lastStudied:x.endTimestamp}}return null}
+/**
+ * Bounded continuity + separated-memory slice for one speaker.
+ *
+ * The remote model only ever sees the thread, the deferred return and the memory
+ * records the local ContinuityEngine already chose to bring forward — never the
+ * full history, and never a topic it decided on its own.
+ */
+export function companionContinuity(s,now,speaker='SAYO'){
+ const proposal=s.initiative?.activeProposal??null;
+ const live=proposal?.threadId?(s.openThreads??[]).find(x=>x.id===proposal.threadId)??null:null;
+ const thread=live??selectThread(s,now);
+ const commitment=proposal?.commitmentId?(s.commitments??[]).find(c=>c.commitmentId===proposal.commitmentId)??null:null;
+ const deferred=dueReturn(s,now);
+ const stage=relationshipStage(metrics(s,now));
+ const memory=new CharacterMemoryRouter().route(s,{speaker,topic:thread?.topic??'',relatedId:thread?.relatedMaterialId??null,limit:2});
+ return {speaker,mode:s.conversation?.mode??null,memory,
+  openThread:thread?{id:thread.id,topic:thread.topic,summary:thread.summary,status:thread.status,source:thread.source,owner:thread.owner}:null,
+  deferredReturn:deferred?{id:deferred.id,kind:deferred.kind,summary:deferred.summary,speakerPreference:deferred.speakerPreference}:null,
+  activeCommitment:commitment?{commitmentId:commitment.commitmentId,title:commitment.title,minutes:commitment.minutes??null,owner:commitment.owner}:null,
+  relationship:{stage,voice:relationshipVoice(stage)}};
+}
 export class ContextAssembler {
- assemble(s,now,userMessage=''){const current=active(s),d=dateKey(now,s.settings.utcOffsetMinutes),lb=s.settings.lifeBalance||{},mode=lb.dailyMode||'NORMAL';const used=Number(lb.entertainmentUsedMinutes||0);return structuredClone({weeklyUsage:weeklyContext(s.lifeBalanceAnalytics,weekStart(now,userMessage.startsWith('先週')),{enabled:lb.usageInConversation!==false,relevant:isWeeklyQuestion(userMessage)}),conversation:stateOf(s,now),characters:CharacterProfiles,currentStudy:current,material:entity(s,'materials',current?.relatedMaterialId),goal:entity(s,'goals',current?.relatedGoalId),task:entity(s,'tasks',current?.relatedTaskId),today:report(s,now,d,d),week:report(s,now,shiftDate(d,-6),d),recentSessions:s.sessions.slice(-5),selectedMemory:[...s.memories].sort((a,b)=>b.importance-a.importance).slice(0,5),relationship:metrics(s,now),dailyUsage:lb.usageInConversation===false?null:{mode,budget:entertainmentBudget(mode,used,lb.budgetMinutes),studyGoalMinutes:Number(lb.studyGoalMinutes||0),studyCompletedMinutes:Math.floor(report(s,now,d,d).seconds/60)}})}
+ assemble(s,now,userMessage='',{speaker='SAYO'}={}){const current=active(s),d=dateKey(now,s.settings.utcOffsetMinutes),lb=s.settings.lifeBalance||{},mode=lb.dailyMode||'NORMAL';const used=Number(lb.entertainmentUsedMinutes||0);return structuredClone({weeklyUsage:weeklyContext(s.lifeBalanceAnalytics,weekStart(now,userMessage.startsWith('先週')),{enabled:lb.usageInConversation!==false,relevant:isWeeklyQuestion(userMessage)}),conversation:stateOf(s,now),characters:CharacterProfiles,currentStudy:current,material:entity(s,'materials',current?.relatedMaterialId),goal:entity(s,'goals',current?.relatedGoalId),task:entity(s,'tasks',current?.relatedTaskId),today:report(s,now,d,d),week:report(s,now,shiftDate(d,-6),d),recentSessions:s.sessions.slice(-3),selectedMemory:[...s.memories].sort((a,b)=>b.importance-a.importance).slice(0,3),relationship:metrics(s,now),companion:companionContinuity(s,now,speaker),dailyUsage:lb.usageInConversation===false?null:{mode,budget:entertainmentBudget(mode,used,lb.budgetMinutes),studyGoalMinutes:Number(lb.studyGoalMinutes||0),studyCompletedMinutes:Math.floor(report(s,now,d,d).seconds/60)}})}
 }
 /** Future providers generate intent only; never receive writable domain state. */
 export class DialogueProvider {async generate(context){throw Error('Provider unavailable')}}

@@ -47,8 +47,21 @@ export class RemoteAIProvider {
  cancel(){this.host?.cancelRemoteAI?.();for(const [id,item] of this.pending){item.finish(Error('remote cancelled'));this.pending.delete(id)}}
 }
 
+/**
+ * Builds the single remote request for one ordered turn.
+ *
+ * The local plan owns who may speak and in what order. Later messages are written
+ * after the earlier ones, so the context also carries the plan's reason and the
+ * bounded companion slice (chosen thread, deferred return, separated memory).
+ * Only the planned characters' profiles are sent.
+ */
 export function remoteRequest(state,userMessage,speaker,context,turn=null){
  const order=(turn?.order??[speaker]).filter(x=>speakers.includes(x));
- const conversationPlan={order:order.length?order:[speaker],allowedSpeakers:[...new Set(order.length?order:[speaker])],maxMessages:Math.min(3,order.length||1)};
- return {speaker,userMessage:String(userMessage??'').slice(0,600),turn:conversationPlan,context:{...context,conversation:context.conversation,characters:context.characters,request:{conversationDepth:state.conversation?.depth??'NORMAL',selectedSpeaker:speaker,conversationPlan}}};
+ const plan=order.length?order:[speaker];
+ const conversationPlan={order:plan,allowedSpeakers:[...new Set(plan)],maxMessages:Math.min(3,plan.length)};
+ const characters={};
+ for(const id of new Set(plan))if(context?.characters?.[id])characters[id]=context.characters[id];
+ return {speaker,userMessage:String(userMessage??'').slice(0,600),turn:conversationPlan,
+  context:{...context,conversation:context?.conversation,characters,companion:context?.companion??null,
+   request:{conversationDepth:state.conversation?.depth??'NORMAL',selectedSpeaker:speaker,conversationPlan,causalOrder:true,reason:turn?.reason??null}}};
 }
