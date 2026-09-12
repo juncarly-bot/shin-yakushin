@@ -29,6 +29,7 @@ jobs:
           main_path=Path('android/app/src/main/java/org/shinyakushin/study/next/MainActivity.java')
           startup_tool=Path('android/tools/check_emulator_startup.py')
           ci_path=Path('.github/workflows/android-v08.yml')
+          causal_test=Path('android/tests/causal-dialogue.test.mjs')
 
           ui=ui_path.read_text()
           anchor="let appCatalog=[];\nlet dailyBalance=null;\n"
@@ -39,7 +40,7 @@ jobs:
           function readStartupMeasurements(){try{return JSON.parse(host.startupMeasurements?.()||'{}')}catch{return {}}}
           function runDebugMeasurement(key,runner,summarize){const started=performance.now();try{const value=runner();debugMeasurements[key]={ok:true,elapsedMs:measuredMs(started),summary:summarize(value)}}catch(error){debugMeasurements[key]={ok:false,elapsedMs:measuredMs(started),summary:error?.message||'実測に失敗しました'}}debugPanelOpen=true;render()}
           function debugPanel(){
-           if(!debugTools)return '';
+           if(!host.debugToolsEnabled?.())return '';
            const snapshot=readStartupMeasurements(),usable=typeof snapshot.timeToUsableChatMs==='number'?snapshot.timeToUsableChatMs:null,marks=snapshot.marks&&typeof snapshot.marks==='object'?snapshot.marks:{};
            const marksHtml=Object.entries(marks).map(([name,value])=>`<div><span>${E(name)}</span><strong>${Number(value)} ms</strong></div>`).join('');
            const tool=(key,title,action,description)=>{const m=debugMeasurements[key];return `<div class="debug-tool"><div class="debug-tool-copy"><strong>${title}</strong><span class="info">${description}</span></div><button type="button" class="small" data-action="${action}">実測する</button>${m?`<div class="debug-result ${m.ok?'ok':'error'}"><strong>${m.elapsedMs} ms</strong><span>${E(m.summary)}</span></div>`:'<div class="debug-result pending">未実測</div>'}</div>`};
@@ -137,7 +138,6 @@ jobs:
               METRICS.append({'label': label, 'timeToUsableChatMs': startup_ms})
               print(label + ': timeToUsableChat=' + (str(startup_ms) + 'ms' if startup_ms is not None else 'not-observed'), flush=True)
           '''
-          # Dedent the raw snippet to the function's four-space indentation.
           metric_code=''.join(line[10:] if line.startswith('          ') else line for line in metric_code.splitlines(True))
           tool=tool.replace(log_line,log_line+metric_code,1)
           finally_anchor="finally:\n    try:\n        Path('app-startup.png').write_bytes(adb('exec-out', 'screencap', '-p'))\n"
@@ -151,6 +151,12 @@ jobs:
           assert workflow.count(artifact)==1, 'startup artifact anchor changed'
           workflow=workflow.replace(artifact,artifact+'            android/startup-metrics.json\n',1)
           ci_path.write_text(workflow)
+
+          causal=causal_test.read_text()
+          old="assert.match(withChat,/たしかに/);"
+          assert causal.count(old)==1, 'polite TT causal test anchor changed'
+          causal=causal.replace(old,"assert.match(withChat,/そうですね/);",1)
+          causal_test.write_text(causal)
 
           test_path=Path('android/tests/debug-measurement-ui.test.mjs')
           assert not test_path.exists(), 'debug measurement test already exists'
