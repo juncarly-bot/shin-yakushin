@@ -2,6 +2,9 @@ import {compatibleLifeBalance} from './life-balance-compat.js';
 import {validateConversation} from './conversation-shape.js';
 import {voiceSettings} from './voice-settings.js';
 import {CommitmentStatus,COMMITMENT_KINDS,COMMITMENT_STATUSES,PROACTIVITY_LEVELS,DEFAULT_MINUTES,MAX_OPEN,isOpen,isMeaningful,matchesStudy} from './commitments.js';
+import {addShared,addCharacterMemory,noteFinishedSession} from './character-memory.js';
+import {detectThread,resolveThreads,resolveThreadsForStudy,markThreadResurfaced,abandonThread} from './continuity.js';
+import {enqueueReturn,markReturnDelivered,pruneReturns} from './return-queue.js';
 /** Android-independent domain. v0.1 segment and identity contracts retained. */
 export const VERSION=2;
 export const kinds=['materials','goals','tasks','plans'];
@@ -17,7 +20,7 @@ const uuid=()=>crypto.randomUUID();
 export const dateKey=(t,offset=540)=>new Date(t+offset*60000).toISOString().slice(0,10);
 export const dateMs=(d,offset=540)=>{if(typeof d!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(d))fail('日付が不正です');const t=Date.parse(d+'T00:00:00Z');if(!Number.isFinite(t)||new Date(t).toISOString().slice(0,10)!==d)fail('日付が不正です');return t-offset*60000};
 export const shiftDate=(d,n)=>dateKey(dateMs(d,0)+n*86400000,0);
-export const fresh=()=>({schemaVersion:VERSION,revision:0,sessions:[],materials:[],goals:[],tasks:[],plans:[],memories:[],visits:[],progressEvents:[],dialogueHistory:{},reaction:null,commitments:[],initiativeStats:{shown:0,accepted:0,declined:0,snoozed:0,completed:0},initiative:{lastPromptAt:0,lastKind:null,lastRelatedId:null,lastDeclinedAt:0,lastDeclinedKind:null,shownDay:null,shownCount:0,snoozeUntil:0,activeProposal:null},settings:{name:'',utcOffsetMinutes:540,breakMinutes:5,quiet:false,notifications:false,remoteAI:false,companion:{proactivity:'NORMAL',quietDay:null},lifeBalance:{dailyMode:'NORMAL',budgetMinutes:{NORMAL:90,HOLIDAY:180,FOCUS:60},interventionLevel:'NORMAL',cooldownMinutes:120,usageInConversation:true,usageNotifications:true,appCategories:{}}},lastSeen:null});
+export const fresh=()=>({schemaVersion:VERSION,revision:0,sessions:[],materials:[],goals:[],tasks:[],plans:[],memories:[],visits:[],progressEvents:[],dialogueHistory:{},reaction:null,commitments:[],sharedMemories:[],characterMemories:{SAYO:[],NurseT:[]},openThreads:[],returnQueue:[],initiativeStats:{shown:0,accepted:0,declined:0,snoozed:0,completed:0},initiative:{lastPromptAt:0,lastKind:null,lastRelatedId:null,lastDeclinedAt:0,lastDeclinedKind:null,shownDay:null,shownCount:0,snoozeUntil:0,activeProposal:null},settings:{name:'',utcOffsetMinutes:540,breakMinutes:5,quiet:false,notifications:false,remoteAI:false,companion:{proactivity:'NORMAL',quietDay:null},lifeBalance:{dailyMode:'NORMAL',budgetMinutes:{NORMAL:90,HOLIDAY:180,FOCUS:60},interventionLevel:'NORMAL',cooldownMinutes:120,usageInConversation:true,usageNotifications:true,appCategories:{}}},lastSeen:null});
 export const active=s=>s.sessions.find(x=>x.endTimestamp===null);
 export const entity=(s,k,id)=>s[k].find(x=>x.id===id);
 export function totals(x,now){const r={study:0,break:0,pause:0};for(const p of x.segments)r[p.kind]+=Math.max(0,(p.end??now)-p.start)/1000;return r}
@@ -35,6 +38,12 @@ export function report(s,now,start,end,filter={}){
 export function metrics(s,now){let seconds=0,reward=0;const days=new Set();for(const x of s.sessions){if(x.endTimestamp===null)continue;const v=totals(x,now).study;seconds+=v;reward+=Math.floor(v/60);for(const p of x.segments){if(p.kind!=='study'||p.end<=p.start)continue;let a=dateKey(p.start,s.settings.utcOffsetMinutes),b=dateKey(p.end-1,s.settings.utcOffsetMinutes);while(a<=b){days.add(a);a=shiftDate(a,1)}}}let streak=0,c=dateKey(now,s.settings.utcOffsetMinutes);if(!days.has(c))c=shiftDate(c,-1);while(days.has(c)){streak++;c=shiftDate(c,-1)}return {seconds,reward,studyBond:Math.round(seconds/36)/100,studyDays:days.size,streak,familiarity:s.visits.length,sharedMemories:s.memories.length}}
 export function validate(s,allowedVersion=VERSION){
  validateConversation(s.conversation,s);
+ // Additive companion-continuity fields: old saves load with safe defaults.
+ for(const key of ['sharedMemories','openThreads','returnQueue'])if(s[key]===undefined)s[key]=[];
+ if(s.characterMemories===undefined||typeof s.characterMemories!=='object'||Array.isArray(s.characterMemories))s.characterMemories={SAYO:[],NurseT:[]};
+ else{for(const who of ['SAYO','NurseT'])if(!Array.isArray(s.characterMemories[who]))s.characterMemories[who]=[];}
+ for(const key of ['sharedMemories','openThreads','returnQueue'])for(const item of s[key]){object(item);str(item.id,200);num(item.createdAt??item.timestamp??0)}
+ for(const who of ['SAYO','NurseT'])for(const item of s.characterMemories[who]){object(item);str(item.id,200);str(item.text,200);num(item.timestamp??0)}
  object(s);if(s.schemaVersion!==allowedVersion)fail('対応していない保存バージョンです。元データは変更しません');num(s.revision);if(!Number.isSafeInteger(s.revision))fail('revisionが不正です');
  for(const key of [...kinds,'sessions','memories','visits','progressEvents'])arr(s[key]);const ids={};
  for(const k of kinds){ids[k]=new Set();for(const o of s[k]){object(o);const id=str(o.id,100);if(!id||ids[k].has(id))fail('IDが空または重複しています');ids[k].add(id);if(!str(o.title,200))fail('名前がありません');str(o.memo);num(o.createdAt);if(o.completedAt!==null)num(o.completedAt);bool(o.archived);if(k==='materials'||k==='goals'){num(o.target,1);num(o.progress,0,o.target);str(o.unit,30)}else{bool(o.done);if(k==='plans')dateMs(o.date)}}}
@@ -88,8 +97,10 @@ export function apply(state,action,p={},now=Date.now()){
       s.initiative.snoozeUntil=0;
       s.initiativeStats.shown=(s.initiativeStats.shown??0)+1;
       if(p.commitmentId){const promised=(s.commitments??[]).find(c=>c.commitmentId===p.commitmentId);if(promised){promised.lastPromptAt=now;promised.promptCount=(promised.promptCount??0)+1;promised.updatedAt=now;if(promised.status===CommitmentStatus.SNOOZED){promised.status=CommitmentStatus.PENDING;promised.snoozedUntil=null}}}
-      s.initiative.activeProposal={id:str(p.id??'proposal',200),kind:str(p.kind??'',60),createdAt:now,expiresAt:Number.isFinite(Number(p.expiresAt))?Number(p.expiresAt):null,title:str(p.title??'',200),commitmentId:p.commitmentId?String(p.commitmentId).slice(0,100):null,relatedMaterialId:p.relatedMaterialId??null,relatedTaskId:p.relatedTaskId??null,relatedGoalId:p.relatedGoalId??null,relatedPlanId:p.relatedPlanId??null,actionOptions:[]};
+      s.initiative.activeProposal={id:str(p.id??'proposal',200),kind:str(p.kind??'',60),createdAt:now,expiresAt:Number.isFinite(Number(p.expiresAt))?Number(p.expiresAt):null,title:str(p.title??'',200),commitmentId:p.commitmentId?String(p.commitmentId).slice(0,100):null,threadId:p.threadId?String(p.threadId).slice(0,120):null,returnId:p.returnId?String(p.returnId).slice(0,120):null,relatedMaterialId:p.relatedMaterialId??null,relatedTaskId:p.relatedTaskId??null,relatedGoalId:p.relatedGoalId??null,relatedPlanId:p.relatedPlanId??null,actionOptions:[]};
       s.initiative.activeProposal.actionOptions=(Array.isArray(p.actionOptions)?p.actionOptions:[]).slice(0,4).map(option=>({id:str(option?.id??'',60),label:str(option?.label??'',60),kind:str(option?.kind??'',40),minutes:Number.isFinite(Number(option?.minutes))?Math.max(1,Math.min(600,Number(option.minutes))):null,quietToday:Boolean(option?.quietToday),relatedMaterialId:option?.relatedMaterialId??null,relatedTaskId:option?.relatedTaskId??null,relatedGoalId:option?.relatedGoalId??null,relatedPlanId:option?.relatedPlanId??null}));
+      if(s.initiative.activeProposal.threadId){const thread=(s.openThreads??[]).find(x=>x.id===s.initiative.activeProposal.threadId);if(thread)markThreadResurfaced(thread,now)}
+      if(s.initiative.activeProposal.returnId){const item=(s.returnQueue??[]).find(x=>x.id===s.initiative.activeProposal.returnId);if(item)markReturnDelivered(item,now)}
       event='initiative';context={kind:p.kind,proposalId:s.initiative.activeProposal.id};break;
     }
  case 'commitment':{
@@ -135,6 +146,27 @@ export function apply(state,action,p={},now=Date.now()){
       if(p.proactivity!==undefined){if(!PROACTIVITY_LEVELS.includes(p.proactivity))fail('積極性の設定が不正です');current.proactivity=p.proactivity}
       if(p.quietDay!==undefined)current.quietDay=p.quietDay;
       s.settings.companion={proactivity:current.proactivity??'NORMAL',quietDay:current.quietDay??null};
+      break;
+    }
+ case 'memoryVault':{
+      if(p.sessionId){const session=s.sessions.find(x=>x.sessionId===p.sessionId),material=session?.relatedMaterialId?entity(s,'materials',session.relatedMaterialId):null;noteFinishedSession(s,session,now,{material});event='memoryVault';context={sessionId:p.sessionId}}
+      else{const record=p.who?addCharacterMemory(s,p.who,p,now):addShared(s,p,now);event='memoryVault';context={id:record?.id??null}}
+      break;
+    }
+ case 'continuity':{
+      if(p.op==='create'){const thread=detectThread(s,p.text??'',now,p.topic??null);event='continuity';context={threadId:thread?.id??null}}
+      else if(p.op==='resolve'){const resolved=resolveThreads(s,p.text??'',now);event='continuity';context={resolved:resolved.length}}
+      else if(p.op==='resolveStudy'){const session=s.sessions.find(x=>x.sessionId===p.sessionId);const resolved=resolveThreadsForStudy(s,session,now);event='continuity';context={resolved:resolved.length}}
+      else if(p.op==='resurface'){const thread=(s.openThreads??[]).find(x=>x.id===p.threadId);if(thread){markThreadResurfaced(thread,now);event='continuity';context={threadId:thread.id}}else event=null}
+      else if(p.op==='abandon'){abandonThread(s,p.threadId,now);event='continuity';context={threadId:p.threadId}}
+      else fail('継続の操作が不正です');
+      break;
+    }
+ case 'returnQueue':{
+      if(p.op==='enqueue'){const record=enqueueReturn(s,p.item??p,now);event='returnQueue';context={id:record?.id??null}}
+      else if(p.op==='deliver'){const item=(s.returnQueue??[]).find(x=>x.id===p.id);if(item)markReturnDelivered(item,now);event='returnQueue';context={id:p.id}}
+      else if(p.op==='prune'){pruneReturns(s,now);event='returnQueue';context={}}
+      else fail('保留の操作が不正です');
       break;
     }
  default:fail('不明な操作です');

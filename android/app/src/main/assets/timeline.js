@@ -1,5 +1,9 @@
 import {resolveConversation,continuation,stateOf} from './conversation.js';
 import {orchestrateConversation,depthContext} from './orchestrator.js';
+import {entity} from './domain.js';
+import {detectThread,resolveThreads,resolveThreadsForStudy} from './continuity.js';
+import {noteFinishedSession} from './character-memory.js';
+import {detectSessionReturn,enqueueReturn,nextMorning} from './return-queue.js';
 export function chatResolution(s,text,now){
  const r=resolveConversation(s,text,now),c=stateOf(s,now);
  r.depthContext=depthContext(s,text,now);
@@ -30,6 +34,18 @@ export function appendTimeline(s,previous,event,now,resolution){
   push(item);added.push(item);
  }
  if(added.length){const c=stateOf(s,now),last=added.at(-1);for(const m of added.slice(1))c.turns.push({speaker:m.speaker,text:m.text,at:m.at});c.turns=c.turns.slice(-6);c.lastSpeaker=last.speaker;c.recentReaction=last.text.slice(0,300);c.lastInteractionAt=now;s.conversation=c;}
+ // Continuity, character memory and deferred returns — all derived from real state.
+ if(resolution?.text){resolveThreads(s,resolution.text,now);if(!resolution.action&&resolution.intent!=='clarify')detectThread(s,resolution.text,now,resolution.topic??null);}
+ if(event==='finish'){
+  const session=s.sessions.find(x=>x.endTimestamp===now);
+  if(session){
+   const material=session.relatedMaterialId?entity(s,'materials',session.relatedMaterialId):null,offset=s.settings.utcOffsetMinutes??540;
+   noteFinishedSession(s,session,now,{material});
+   resolveThreadsForStudy(s,session,now);
+   const item=detectSessionReturn(session,offset);
+   if(item)enqueueReturn(s,{...item,createdAt:now,availableAfter:nextMorning(now,offset)},now);
+  }
+ }
  // Bounded chat storage, never prune StudySession or important Memory.
  s.messages=s.messages.slice(-1000);
  if(resolution?.depthContext)s.conversation.depthContext=resolution.depthContext;

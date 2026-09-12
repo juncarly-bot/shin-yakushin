@@ -13,6 +13,11 @@ const POSTPONE=/あとで|後で|今度|次に|また今度|保留/;
 const RESOLVE=/わかった|分かった|理解できた|解決|できたよ|うまくいった/;
 
 const clip=(x,n)=>String(x??'').trim().slice(0,n);
+/** Pull the subject out of "境界条件まだよく分からない" -> "境界条件". */
+export function extractTopic(value){
+ const cleaned=String(value??'').replace(/[。、！!？?\s]/g,'').replace(/(まだ)?(よく)?(わから|分から|むずかし|難し|つまず|引っかか|詰ま).*$/,'').replace(/[がはをにの]$/,'');
+ return clip(cleaned,40)||clip(value,20);
+}
 
 export function openThread(s,fields,now){
  const topic=clip(fields.topic,80);
@@ -37,7 +42,7 @@ export function detectThread(s,text,now,topic=null){
  const value=clip(text,200);
  if(!value)return null;
  if(STUCK.test(value)){
-  const title=clip(topic?.item?.title??topic,60)||value.slice(0,40);
+  const title=clip(topic?.item?.title??topic,60)||extractTopic(value);
   return openThread(s,{topic:title,summary:value,source:ThreadSource.STUCK,owner:'SAYO',priority:60,
    relatedMaterialId:topic?.kind==='materials'?topic.item.id:(topic?.item?.relatedMaterialId??null),
    relatedTaskId:topic?.kind==='tasks'?topic.item.id:null,relatedGoalId:topic?.kind==='goals'?topic.item.id:null},now);

@@ -8,13 +8,16 @@
 import {active,report,dateKey,entity,totals} from './domain.js';
 import {previousStudy} from './companion.js';
 import {CommitmentKind,CommitmentStatus,PROACTIVITY_LEVELS,isOpen,formatClock,DEFAULT_MINUTES} from './commitments.js';
+import {dueReturn,returnMessages} from './return-queue.js';
+import {selectThread,threadMessages} from './continuity.js';
 
 export const InitiativeKind=Object.freeze({
  CONTINUE_PREVIOUS_STUDY:'CONTINUE_PREVIOUS_STUDY',START_SMALL_SESSION:'START_SMALL_SESSION',
  FOLLOW_UP_COMMITMENT:'FOLLOW_UP_COMMITMENT',REVIEW_TODAY:'REVIEW_TODAY',REVIEW_WEEK:'REVIEW_WEEK',
  RETURN_TO_STUDY:'RETURN_TO_STUDY',TAKE_BREAK:'TAKE_BREAK',FINISH_FOR_TODAY:'FINISH_FOR_TODAY',
  RECORD_PROGRESS:'RECORD_PROGRESS',RESUME_UNFINISHED_TASK:'RESUME_UNFINISHED_TASK',
- LIGHT_STUDY_DAY:'LIGHT_STUDY_DAY',CELEBRATE_RECOVERY:'CELEBRATE_RECOVERY'
+ LIGHT_STUDY_DAY:'LIGHT_STUDY_DAY',CELEBRATE_RECOVERY:'CELEBRATE_RECOVERY',
+ OPEN_THREAD_FOLLOWUP:'OPEN_THREAD_FOLLOWUP',DEFERRED_RETURN:'DEFERRED_RETURN'
 });
 export const INITIATIVE_KINDS=Object.freeze(Object.values(InitiativeKind));
 export {PROACTIVITY_LEVELS};
@@ -64,6 +67,17 @@ function commitmentProposal(s,commitment,now,offset){
 }
 
 /** Pure evaluation. Returns an InitiativeProposal or null; never mutates. */
+function returnProposal(s,item,now,offset){
+ return proposal({id:`DEFERRED_RETURN:${item.id}`,kind:InitiativeKind.DEFERRED_RETURN,createdAt:now,speakerPlan:[item.speakerPreference],
+  reason:'deferred-return',title:item.summary,returnId:item.id,messages:returnMessages(item),actionOptions:[],expiresAt:item.expiresAt,priority:90});
+}
+function threadProposal(s,thread,now,offset){
+ const owner=thread.owner==='NurseT'?'NurseT':'SAYO';
+ return proposal({id:`OPEN_THREAD:${thread.id}`,kind:InitiativeKind.OPEN_THREAD_FOLLOWUP,createdAt:now,speakerPlan:[owner],
+  reason:'open-thread',title:thread.topic,threadId:thread.id,messages:threadMessages(thread),
+  actionOptions:[{id:'review',kind:ActionKind.REVIEW,label:'続きを話す'},{id:'later',kind:ActionKind.SNOOZE,label:'あとで',minutes:60}],
+  expiresAt:now+12*HOUR,priority:55,relatedMaterialId:thread.relatedMaterialId??null,relatedTaskId:thread.relatedTaskId??null,relatedGoalId:thread.relatedGoalId??null});
+}
 export function evaluate(s,now,{source='open'}={}){
  const offset=s.settings?.utcOffsetMinutes??540,today=dateKey(now,offset),companion=s.settings?.companion??{},state=s.initiative??{};
  const level=proactivityOf(s),caps=CAPS[level],due=dueCommitment(s,now);
@@ -86,6 +100,11 @@ export function evaluate(s,now,{source='open'}={}){
    messages:[{speaker:'NurseT',text:'90分続いています。一度休憩してからでも遅くありません。'}],actionOptions:[{id:'break',kind:ActionKind.BREAK,label:'休憩する'},{id:'later',kind:ActionKind.SNOOZE,label:'まだ続ける',minutes:30}],expiresAt:now+2*HOUR,priority:70});
   return null;
  }
+ // A deferred observation or a still-open thread outranks generic suggestions.
+ const deferred=dueReturn(s,now);
+ if(deferred)return returnProposal(s,deferred,now,offset);
+ const thread=selectThread(s,now);
+ if(thread)return threadProposal(s,thread,now,offset);
  const day=report(s,now,today,today),studiedMinutes=Math.floor(day.seconds/60),goal=Number(s.settings?.lifeBalance?.studyGoalMinutes||0);
  if(goal>0&&studiedMinutes>=goal)return null;
  const previous=previousStudy(s),hour=Number(new Date(now+offset*60000).toISOString().slice(11,13)),lateNight=hour>=23||hour<5;
