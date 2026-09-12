@@ -2,7 +2,7 @@ name: Android v0.8 life balance build
 
 on:
   push:
-    branches: [android-v08-life-balance, android-v08-integration, android-v08-companion-initiative]
+    branches: [android-v08-life-balance, android-v08-integration, android-v08-companion-initiative, android-v08-character-continuity]
   workflow_dispatch:
 
 permissions:
