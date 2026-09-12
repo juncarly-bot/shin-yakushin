@@ -41,7 +41,7 @@ const sayoReact={
 const nurseReact={
  agreeAdd:['私も賛成です。ただ、{add}','いいと思います。{add}'],
  feasibility:['{duration}を一度に、ですか？','{duration}を一度に、ですか？'],
- disagree:['たしかに。ただ、{add}']
+ disagree:['そうですね。ただ、{add}']
 };
 
 /** Deterministic bounded variation — least-recently-used template, never random. */
