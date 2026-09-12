@@ -35,7 +35,8 @@ dialog.addEventListener('input',e=>{if(e.target.id==='app-search'){const q=e.tar
 dialog.addEventListener('change',e=>{const pkg=e.target.dataset.appCategory;if(!pkg)return;const category=e.target.value;if(!['ENTERTAINMENT','STUDY','NEUTRAL'].includes(category))return;const lb=S.settings.lifeBalance||{};if(command('settings',{...S.settings,lifeBalance:{...lb,appCategories:{...lb.appCategories,[pkg]:category}}}))toast('分類を保存しました');else e.target.value=lb.appCategories?.[pkg]||'NEUTRAL'});
 const latency=createLatencyTracker({enabled:Boolean(host?.debugToolsEnabled?.()),sink:line=>console.log(line)});
 /** Debug-only startup trace; the host decides whether the marks are logged. */
-const startup=createStartupTrace({enabled:Boolean(host?.debugToolsEnabled?.()),emit:name=>{try{host?.debugMark?.(name)}catch{}}});
+const debugTools=Boolean(host?.debugToolsEnabled?.());
+const startup=createStartupTrace({enabled:debugTools,emit:name=>{try{host?.debugMark?.(name);if(debugTools)console.log('STARTUP_MARK '+name)}catch{}}});
 let latencyLocalTurn=false,pendingTyping=null,pendingRemote=null,finishProposal=null;
 function typingLabel(speakers){const names=[...new Set((speakers||[]).filter(s=>['SAYO','NurseT'].includes(s)))],shown=names.map(s=>s==='NurseT'?'TTちゃん':'小夜');return shown.length>1?`${shown.join('と')}が話しています…`:`${shown[0]||'小夜'}が入力中…`}
 function typingHtml(){if(!pendingTyping)return '';return `<article class="message-row incoming typing" role="status" aria-live="polite">${avatar(pendingTyping.speaker)}<div class="message incoming"><div class="message-speaker">${pendingTyping.name}</div><div class="bubble typing-bubble"><span class="typing-text">${E(pendingTyping.text)}</span><span class="typing-dots" aria-hidden="true"><span></span><span></span><span></span></span></div><button type="button" class="text-button typing-cancel" data-action="useLocalReply">端末内の返答を使う</button></div></article>`}

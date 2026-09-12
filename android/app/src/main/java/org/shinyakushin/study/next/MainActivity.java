@@ -56,7 +56,13 @@ public final class MainActivity extends Activity {
                 try{return response(path.endsWith(".js")?"text/javascript":path.endsWith(".css")?"text/css":path.endsWith(".png")?"image/png":"text/html",200,"OK",getAssets().open(path.substring(1)));}catch(IOException ex){return response("text/plain",404,"Not found",new ByteArrayInputStream(new byte[0]));}
             }
         });
-        web.setWebChromeClient(new WebChromeClient());startupMark("webview_create");web.loadUrl(ORIGIN+"/index.html");startupMark("loadUrl_start");BreakReceiver.channel(this);LifeBalanceNotifier.ensureChannel(this);CommitmentNotifier.ensureChannel(this);LifeBalanceScheduler.ensure(this);handleIntervention(getIntent());handleCommitment(getIntent());
+        web.setWebChromeClient(new WebChromeClient(){
+            /** Debug-only mirror of the JS startup marks, so the whole timeline is visible in one place. */
+            @Override public boolean onConsoleMessage(ConsoleMessage message){
+                if(startupLog&&message!=null)android.util.Log.i(STARTUP_TAG,"JS "+message.message());
+                return true;
+            }
+        });startupMark("webview_create");web.loadUrl(ORIGIN+"/index.html");startupMark("loadUrl_start");BreakReceiver.channel(this);LifeBalanceNotifier.ensureChannel(this);CommitmentNotifier.ensureChannel(this);LifeBalanceScheduler.ensure(this);handleIntervention(getIntent());handleCommitment(getIntent());
     }
     /** DEBUG-visible timestamp relative to process start. Never shown in a release build. */
     private void startupMark(String name){
