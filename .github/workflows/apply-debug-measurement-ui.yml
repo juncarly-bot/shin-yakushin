@@ -1,0 +1,205 @@
+name: Apply measured debug UI patch
+
+on:
+  push:
+    branches: [android-v08-character-continuity]
+    paths: [.github/workflows/apply-debug-measurement-ui.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: android-v08-character-continuity
+          fetch-depth: 0
+
+      - name: Apply measured debug UI and runtime instrumentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          ui_path=Path('android/app/src/main/assets/ui.js')
+          css_path=Path('android/app/src/main/assets/style.css')
+          main_path=Path('android/app/src/main/java/org/shinyakushin/study/next/MainActivity.java')
+          startup_tool=Path('android/tools/check_emulator_startup.py')
+          ci_path=Path('.github/workflows/android-v08.yml')
+
+          ui=ui_path.read_text()
+          anchor="let appCatalog=[];\nlet dailyBalance=null;\n"
+          assert ui.count(anchor)==1, 'ui globals anchor changed'
+          helpers=r'''let debugMeasurements={};
+          let debugPanelOpen=false;
+          const measuredMs=start=>Math.round((performance.now()-start)*10)/10;
+          function readStartupMeasurements(){try{return JSON.parse(host.startupMeasurements?.()||'{}')}catch{return {}}}
+          function runDebugMeasurement(key,runner,summarize){const started=performance.now();try{const value=runner();debugMeasurements[key]={ok:true,elapsedMs:measuredMs(started),summary:summarize(value)}}catch(error){debugMeasurements[key]={ok:false,elapsedMs:measuredMs(started),summary:error?.message||'実測に失敗しました'}}debugPanelOpen=true;render()}
+          function debugPanel(){
+           if(!debugTools)return '';
+           const snapshot=readStartupMeasurements(),usable=typeof snapshot.timeToUsableChatMs==='number'?snapshot.timeToUsableChatMs:null,marks=snapshot.marks&&typeof snapshot.marks==='object'?snapshot.marks:{};
+           const marksHtml=Object.entries(marks).map(([name,value])=>`<div><span>${E(name)}</span><strong>${Number(value)} ms</strong></div>`).join('');
+           const tool=(key,title,action,description)=>{const m=debugMeasurements[key];return `<div class="debug-tool"><div class="debug-tool-copy"><strong>${title}</strong><span class="info">${description}</span></div><button type="button" class="small" data-action="${action}">実測する</button>${m?`<div class="debug-result ${m.ok?'ok':'error'}"><strong>${m.elapsedMs} ms</strong><span>${E(m.summary)}</span></div>`:'<div class="debug-result pending">未実測</div>'}</div>`};
+           return `<details class="debug-panel section" data-debug-panel ${debugPanelOpen?'open':''}><summary><span>開発・実測</span><span class="debug-badge">DEBUG</span></summary><div class="debug-panel-body"><p class="muted">実機上の時間と判定結果です。通常のメニューとは分離しています。</p><div class="debug-startup"><div><span class="info">起動 → 会話入力可能</span><strong>${usable===null?'未取得':usable+' ms'}</strong></div><span class="info">process start → composer interactive</span>${marksHtml?`<details class="debug-marks"><summary>起動マークの内訳</summary>${marksHtml}</details>`:''}</div><div class="debug-tools">${tool('lifeBalance','LifeBalance 判定','debugLifeBalance','Workerと同じread-only checkの実行時間')}${tool('initiative','提案エンジン','debugInitiative','現在の状態から提案を評価する時間')}${tool('commitment','約束期限チェック','debugCommitment','期限判定と通知判断の実行時間')}</div>${host.migrationQaEnabled?.()?'<button class="wide debug-migration" data-action="migrationQa">移行QAを開く<span class="info">バックアップを読み取り専用で検証</span></button>':''}</div></details>`;
+          }
+          '''
+          ui=ui.replace(anchor,anchor+helpers,1)
+
+          more_start=ui.index('function more(){')
+          more_end=ui.index('\nfunction settings()',more_start)
+          new_more='''function more(){return `<div class="eyebrow">YOUR SPACE</div><h1>いつもの場所を整える。</h1><div class="menu-grid section"><button data-page="weekly">生活バランスの週次記録<span class="info">記録のある日と先週比</span></button><button data-page="records">振り返り<span class="info">今日と一週間の学習</span></button><button data-page="journey">一緒に積み重ねたこと<span class="info">学びのしるし・二人との時間</span></button><button data-page="memories">思い出<span class="info">覚えておきたい学習の節目</span></button><button data-page="settings">設定・バックアップ<span class="info">過ごし方と、大切な記録の保管</span></button></div>${debugPanel()}`}
+          '''
+          ui=ui[:more_start]+new_more.rstrip()+ui[more_end:]
+
+          debug_start=ui.index("if(a==='debugLifeBalance')")
+          debug_end=ui.index("if(a==='licenses')",debug_start)
+          debug_actions=r'''if(a==='debugLifeBalance'){runDebugMeasurement('lifeBalance',()=>JSON.parse(host.runLifeBalanceNow?.()||'{}'),r=>r.checked?`checked · reason=${r.reason??'unknown'} · speaker=${r.speaker??'none'} · notified=${Boolean(r.notified)}`:`no-op · reason=${r.reason??'unknown'}`);return}if(a==='debugInitiative'){runDebugMeasurement('initiative',()=>evaluate(S,now(),{source:'debug'}),p=>p?`${p.kind} · ${p.reason} · ${(p.speakerPlan||[]).join('+')||'speakerなし'}`:'今は提案なし');return}if(a==='debugCommitment'){runDebugMeasurement('commitment',()=>JSON.parse(host.runCommitmentCheck?.()||'{}'),r=>r.checked?`checked · reason=${r.reason??'unknown'} · notified=${Boolean(r.notified)} · id=${r.commitmentId??'none'}`:`no-op · reason=${r.reason??'unknown'}`);return}'''
+          ui=ui[:debug_start]+debug_actions+ui[debug_end:]
+
+          click_anchor="root.addEventListener('click',e=>{if(e.target.closest('[data-page=\"settings\"],[data-action=\"refreshBalance\"]'))host.requestDailyBalance?.();host.requestDailyHistory?.()});\n"
+          assert ui.count(click_anchor)==1, 'root click anchor changed'
+          ui=ui.replace(click_anchor,click_anchor+"root.addEventListener('click',e=>{const summary=e.target.closest('details[data-debug-panel] > summary');if(summary)debugPanelOpen=!summary.parentElement.open});\n",1)
+          ui_path.write_text(ui)
+
+          css=css_path.read_text()
+          old_tt='content:"T";font-size:12px'
+          if old_tt in css:
+              css=css.replace(old_tt,'content:"TTちゃん";font-size:12px',1)
+          assert 'content:"TTちゃん";font-size:12px' in css, 'TT display label not found'
+          marker='/* compact debug measurement panel */'
+          assert marker not in css, 'debug panel CSS already present'
+          css += r'''
+
+          /* compact debug measurement panel */
+          .debug-panel{margin-top:26px;border:1px solid var(--line,#d8ddd8);border-radius:16px;background:var(--paper,#fff);overflow:hidden}
+          .debug-panel>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:52px;padding:0 16px;color:var(--muted,#68736d);font-size:13px;font-weight:650;list-style:none}
+          .debug-panel>summary::-webkit-details-marker{display:none}
+          .debug-badge{font-size:10px;letter-spacing:.12em;padding:4px 7px;border:1px solid var(--line,#d8ddd8);border-radius:999px;color:var(--green,#315f50)}
+          .debug-panel-body{border-top:1px solid var(--line,#d8ddd8);padding:14px 16px 16px}
+          .debug-startup{padding:13px 14px;border-radius:12px;background:rgba(50,95,80,.055);margin:10px 0 12px}
+          .debug-startup>div:first-child{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+          .debug-startup strong{font-size:19px;font-variant-numeric:tabular-nums;color:var(--text,#2f3934)}
+          .debug-tools{display:grid;gap:9px}
+          .debug-tool{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px 12px;padding:11px 0;border-top:1px solid var(--line,#d8ddd8)}
+          .debug-tool:first-child{border-top:0}
+          .debug-tool-copy{min-width:0}
+          .debug-tool-copy>strong{display:block;font-size:14px;font-weight:650}
+          .debug-tool .small{min-width:92px}
+          .debug-result{grid-column:1/-1;display:flex;gap:9px;align-items:baseline;font-size:11px;color:var(--muted,#68736d);overflow-wrap:anywhere}
+          .debug-result strong{font-size:13px;font-variant-numeric:tabular-nums;color:var(--text,#2f3934);white-space:nowrap}
+          .debug-result.error,.debug-result.error strong{color:#9b4747}
+          .debug-result.ok strong{color:var(--green,#315f50)}
+          .debug-result.pending{opacity:.7}
+          .debug-marks{margin-top:8px}
+          .debug-marks>summary{min-height:36px;padding:0;font-size:11px;color:var(--muted,#68736d)}
+          .debug-marks>div{display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:10px;color:var(--muted,#68736d)}
+          .debug-marks>div strong{font-size:10px;font-weight:600}
+          .debug-migration{margin-top:12px}
+          @media(max-width:360px){.debug-tool{grid-template-columns:1fr}.debug-tool .small{width:100%}}
+          '''
+          css_path.write_text(css)
+
+          main=main_path.read_text()
+          field='    private long processStart=0;\n'
+          assert main.count(field)==1, 'processStart field anchor changed'
+          main=main.replace(field,field+'    private final Map<String,Long> startupMeasurements=Collections.synchronizedMap(new LinkedHashMap<>());\n',1)
+          elapsed='        long elapsed=Math.max(0,SystemClock.uptimeMillis()-processStart);\n'
+          assert main.count(elapsed)==1, 'startup elapsed anchor changed'
+          main=main.replace(elapsed,elapsed+'        synchronized(startupMeasurements){if(!startupMeasurements.containsKey(name))startupMeasurements.put(name,elapsed);}\n',1)
+          bridge='        @JavascriptInterface public void debugMark(String name){startupMark(name);}\n'
+          assert main.count(bridge)==1, 'debugMark bridge anchor changed'
+          snapshot=r'''        @JavascriptInterface public String startupMeasurements(){
+              if(!startupLog)return "{}";
+              try{
+                  JSONObject result=new JSONObject(),marks=new JSONObject();Long usable;
+                  synchronized(startupMeasurements){
+                      for(Map.Entry<String,Long> entry:startupMeasurements.entrySet())marks.put(entry.getKey(),entry.getValue());
+                      usable=startupMeasurements.get("composer_interactive");
+                  }
+                  result.put("marks",marks);result.put("timeToUsableChatMs",usable==null?JSONObject.NULL:usable);
+                  return result.toString();
+              }catch(JSONException impossible){return "{}";}
+          }
+          '''
+          main=main.replace(bridge,bridge+snapshot,1)
+          main_path.write_text(main)
+
+          tool=startup_tool.read_text()
+          tool=tool.replace('import os\nimport subprocess\nimport time\n','import os\nimport subprocess\nimport time\nimport json\nimport re\n',1)
+          tool=tool.replace("EMULATOR = ('adb', '-s', 'emulator-5554')\n","EMULATOR = ('adb', '-s', 'emulator-5554')\nMETRICS = []\n",1)
+          log_line="    Path('app-startup-logcat.txt').write_text(log)\n"
+          assert tool.count(log_line)==1, 'startup log anchor changed'
+          metric_code=r'''    matches = re.findall(r'STARTUP_LATENCY timeToUsableChat (\d+)ms', log)
+              startup_ms = int(matches[-1]) if matches else None
+              METRICS.append({'label': label, 'timeToUsableChatMs': startup_ms})
+              print(label + ': timeToUsableChat=' + (str(startup_ms) + 'ms' if startup_ms is not None else 'not-observed'), flush=True)
+          '''
+          # Dedent the raw snippet to the function's four-space indentation.
+          metric_code=''.join(line[10:] if line.startswith('          ') else line for line in metric_code.splitlines(True))
+          tool=tool.replace(log_line,log_line+metric_code,1)
+          finally_anchor="finally:\n    try:\n        Path('app-startup.png').write_bytes(adb('exec-out', 'screencap', '-p'))\n"
+          assert tool.count(finally_anchor)==1, 'startup finally anchor changed'
+          replacement="finally:\n    Path('startup-metrics.json').write_text(json.dumps({'runs': METRICS}, ensure_ascii=False, indent=2))\n    try:\n        Path('app-startup.png').write_bytes(adb('exec-out', 'screencap', '-p'))\n"
+          tool=tool.replace(finally_anchor,replacement,1)
+          startup_tool.write_text(tool)
+
+          workflow=ci_path.read_text()
+          artifact='            android/app-startup.txt\n'
+          assert workflow.count(artifact)==1, 'startup artifact anchor changed'
+          workflow=workflow.replace(artifact,artifact+'            android/startup-metrics.json\n',1)
+          ci_path.write_text(workflow)
+
+          test_path=Path('android/tests/debug-measurement-ui.test.mjs')
+          assert not test_path.exists(), 'debug measurement test already exists'
+          test_path.write_text(r'''import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
+          const root=new URL('../',import.meta.url),read=p=>readFileSync(new URL(p,root),'utf8');
+          const ui=read('app/src/main/assets/ui.js'),css=read('app/src/main/assets/style.css'),main=read('app/src/main/java/org/shinyakushin/study/next/MainActivity.java');
+
+          test('development controls are separated from the normal menu',()=>{
+           const more=ui.slice(ui.indexOf('function more(){'),ui.indexOf('function settings()'));
+           assert.match(more,/\$\{debugPanel\(\)\}/);
+           assert.doesNotMatch(more,/debugLifeBalance|debugInitiative|debugCommitment/);
+           assert.match(ui,/details class="debug-panel section" data-debug-panel/);
+           assert.match(css,/\.debug-panel\{/);
+          });
+
+          test('debug actions report measured wall time instead of only a toast',()=>{
+           assert.match(ui,/performance\.now\(\)/);
+           for(const key of ['lifeBalance','initiative','commitment'])assert.ok(ui.includes(`runDebugMeasurement('${key}'`),key);
+           assert.match(ui,/elapsedMs:measuredMs/);
+          });
+
+          test('native startup marks are exposed to debug UI as an actual process-start measurement',()=>{
+           assert.match(main,/Map<String,Long> startupMeasurements/);
+           assert.match(main,/public String startupMeasurements\(\)/);
+           assert.match(main,/timeToUsableChatMs/);
+           assert.match(ui,/process start → composer interactive/);
+          });
+
+          test('TT compact speaker label is no longer a bare T',()=>{
+           assert.match(css,/content:"TTちゃん";font-size:12px/);
+           assert.doesNotMatch(css,/content:"T";font-size:12px/);
+          });
+          ''')
+          PY
+
+      - name: Verify JS regression suite
+        working-directory: android
+        run: |
+          npm run check
+          npm test
+
+      - name: Commit measured debug UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/apply-debug-measurement-ui.yml
+          git config user.name "juncarly-bot"
+          git config user.email "jun.carly@gmail.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(debug): add measured diagnostics and compact dev UI"
+          git push origin HEAD:android-v08-character-continuity
