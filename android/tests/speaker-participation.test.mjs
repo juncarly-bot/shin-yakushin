@@ -56,7 +56,7 @@ test('a long reasoned exchange alternates instead of letting SAYO monopolize',()
 });
 
 test('local SAYO lines stay casual rather than coach-like',()=>{
- const source=readFileSync(new URL('../app/src/main/assets/orchestrator.js',import.meta.url),'utf8');
+ const source=readFileSync(new URL('../app/src/main/assets/dialogue.js',import.meta.url),'utf8');
  for(const casual of ['じゃ終わろ終わろ','やるなら15分だけやろー','お、今日は早いじゃん'])assert.ok(source.includes(casual),casual);
 });
 
