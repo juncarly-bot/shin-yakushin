@@ -67,7 +67,11 @@ public final class MainActivity extends Activity {
     /** DEBUG-visible timestamp relative to process start. Never shown in a release build. */
     private void startupMark(String name){
         if(!startupLog||!STARTUP_MARKS.contains(name))return;
-        android.util.Log.i(STARTUP_TAG,"STARTUP_MARK "+name+" "+Math.max(0,SystemClock.uptimeMillis()-processStart)+"ms");
+        long elapsed=Math.max(0,SystemClock.uptimeMillis()-processStart);
+        android.util.Log.i(STARTUP_TAG,"STARTUP_MARK "+name+" "+elapsed+"ms");
+        // The headline metric is time to usable chat, not the time until every
+        // advisory subsystem (VOICE, Memory, Usage, Continuity) has finished.
+        if("composer_interactive".equals(name))android.util.Log.i(STARTUP_TAG,"STARTUP_LATENCY timeToUsableChat "+elapsed+"ms");
     }
     /** Opens and validates the saved state off the main thread, then arms the reminders. */
     private void warmStore(){

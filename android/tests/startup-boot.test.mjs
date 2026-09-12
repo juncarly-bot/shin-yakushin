@@ -91,6 +91,8 @@ test('startup marks are debug-only',()=>{
  assert.ok(main.includes('FLAG_DEBUGGABLE'),'the native trace is gated on a debuggable build');
  assert.match(main,/void startupMark\(String name\)\{\s*if\(!startupLog/);
  assert.ok(main.includes('public void debugMark(String name)'));
+ assert.match(main,/composer_interactive"\.equals\(name\)\)android\.util\.Log\.i\(STARTUP_TAG,"STARTUP_LATENCY timeToUsableChat "/,'the native trace reports time to usable chat');
+ assert.ok(main.includes('"JS "+message.message()'),'debug builds mirror the JS timeline into logcat');
  assert.ok(ui.includes("enabled:Boolean(host?.debugToolsEnabled?.())"),'JS marks are gated on the debug host too');
  assert.ok(!/fetch\(|XMLHttpRequest|WebSocket|navigator\.sendBeacon/.test(readFileSync(new URL('../app/src/main/assets/startup.js',import.meta.url),'utf8')),'startup marks never leave the device');
 });
