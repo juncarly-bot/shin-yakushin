@@ -44,7 +44,6 @@ export function directAddress(text){
  return null;
 }
 
-const CTA=/やる|始め|続き|休憩|振り返|決め|おわり|終わ/;
 /** Recommendation kinds that turn a turn into an action-oriented interaction. */
 const CTA_KINDS=['START','CONTINUE','PLAN_NEXT','BREAK','REVIEW'];
 const isQuestion=text=>/[？?]\s*$/.test(String(text??'').trim());

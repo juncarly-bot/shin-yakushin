@@ -6,8 +6,6 @@
  * deterministic implementation; the remote provider receives the same ordered
  * contract and must satisfy it too.
  */
-import {profileFor} from './characters.js';
-import {ConversationMode} from './character-decision.js';
 
 const sayoBank={
  'wind-down':['じゃ今日は終わろー。','じゃ終わろ終わろ。','今日はもう切り上げよっか。','ここまででいっか。'],

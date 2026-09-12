@@ -5,7 +5,7 @@
  */
 export const ReturnKind=Object.freeze({PATTERN:'PATTERN',COMMITMENT:'COMMITMENT',GOAL:'GOAL',USAGE_RECOVERY:'USAGE_RECOVERY',THREAD_RESOLUTION:'THREAD_RESOLUTION',WEEKLY:'WEEKLY'});
 export const MAX_RETURNS=40;
-const HOUR=3600000,DAY=86400000;
+const DAY=86400000;
 
 export function enqueueReturn(s,item,now){
  s.returnQueue??=[];
