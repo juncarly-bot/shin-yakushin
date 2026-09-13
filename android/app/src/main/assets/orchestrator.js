@@ -94,7 +94,7 @@ export function orchestrateConversation(s,event,resolution,now){
  const question=isQuestion(s.reaction.text);
  const cta=order=>order.some(id=>CTA_KINDS.includes(decisions[id].recommendation.kind));
  const guarded=guardStructure(s,{mode:situation.mode,order,question,cta:cta(order)});
- if(guarded.adjusted&&guarded.order.length>=1&&guarded.order.length<=3)order=guarded.order;
+ if(!directAddress(text)&&guarded.adjusted&&guarded.order.length>=1&&guarded.order.length<=3)order=guarded.order;
  const relationship={stage:relationshipStage(metrics(s,now)),voice:relationshipVoice(relationshipStage(metrics(s,now)))};
  const lead=s.reaction.speaker===order[0]&&useLead(situation,decisions[order[0]],s.reaction)?{speaker:order[0],text:s.reaction.text}:null;
  const messages=composeDialogue(s,{order,situation,decisions,now,lead,relationship});

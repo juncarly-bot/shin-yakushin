@@ -76,6 +76,16 @@ export function phrase(s,id,decision,situation,now){
  * never drift away from what was actually said.
  */
 export function reaction(s,id,own,prior,situation,now){
+ // The emitted text can differ from its planned decision (e.g. a local lead).
+ // Listen to that actual line before using the decision as a fallback.
+ const spoken=String(prior.text??'');
+ const rests=/休もう|休もー|休憩|寝よ|寝る|切り上げ|ここまで|終わろ/.test(spoken)&&!/休まない|寝ない/.test(spoken);
+ if(rests){
+  if(id==='NurseT')return own.recommendation.kind==='PLAN_NEXT'?'私も賛成です。明日の開始位置だけ決めておきましょう。':'では、休む時間を確保しましょう。続きは後で大丈夫です。';
+  return 'うん、そうしよ。今日は無理しなくていっか。';
+ }
+ if(id==='SAYO'&&/一度に|分ける|区切り/.test(spoken))return pick(s,'SAYO:heard-feasibility',sayoReact['feasibility-check'],now);
+
  if(id==='NurseT'){
   const priorKind=prior.recommendation.kind,ownKind=own.recommendation.kind;
   if(ownKind===priorKind||own.stance==='agree-and-plan'){
@@ -99,11 +109,12 @@ export function reaction(s,id,own,prior,situation,now){
  * Each message after the first is composed with the previous message known.
  */
 export function composeDialogue(s,{order=[],situation,decisions,now,lead=null,relationship=null}){
+ if(!Array.isArray(order)||order.length>3||order.some(id=>!['SAYO','NurseT'].includes(id)))throw Error('invalid dialogue order');
  const messages=[];
  for(const [index,id] of order.entries()){
   const own=decisions[id];
   const useLead=index===0&&lead&&lead.speaker===id&&lead.text;
-  const text=useLead?lead.text:index===0?phrase(s,id,own,situation,now):reaction(s,id,own,decisions[order[index-1]],situation,now);
+  const text=useLead?lead.text:index===0?phrase(s,id,own,situation,now):reaction(s,id,own,{...decisions[order[index-1]],text:messages[index-1].text},situation,now);
   messages.push({speaker:id,text,emotion:own.emotion,stance:own.stance,recommendation:own.recommendation});
  }
  return messages;

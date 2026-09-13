@@ -65,8 +65,8 @@ test('composeDialogue keeps the planned order and reacts pair by pair',()=>{
  const messages=composeDialogue({}, {order:['SAYO','NurseT','SAYO'],situation,decisions,now:T});
  assert.deepEqual(messages.map(m=>m.speaker),['SAYO','NurseT','SAYO']);
  assert.equal(messages[0].text,phrase({},'SAYO',decisions.SAYO,situation,T));
- assert.equal(messages[1].text,reaction({},'NurseT',decisions.NurseT,decisions.SAYO,situation,T));
- assert.equal(messages[2].text,reaction({},'SAYO',decisions.SAYO,decisions.NurseT,situation,T));
+ assert.equal(messages[1].text,reaction({},'NurseT',decisions.NurseT,{...decisions.SAYO,text:messages[0].text},situation,T));
+ assert.equal(messages[2].text,reaction({},'SAYO',decisions.SAYO,{...decisions.NurseT,text:messages[1].text},situation,T));
 });
 
 test('direct invocation is honoured and never exceeds the bound',()=>{

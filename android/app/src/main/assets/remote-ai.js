@@ -1,3 +1,4 @@
+import {CharacterMemoryRouter} from './character-memory.js';
 const allowedEmotions=new Set(['calm','pleased','focused','concerned','relaxed','proud','tired_context']);
 const speakers=['SAYO','NurseT'];
 
@@ -16,7 +17,8 @@ export function validateTurn(value,plan){
    const speaker=String(message?.speaker??'');
    if(!order.includes(speaker))throw Error('invalid remote speaker');
    if(speaker!==order[index])throw Error('invalid remote speaker order');
-   const text=String(message?.text??'').trim().slice(0,800);
+   if(typeof message?.text!=='string')throw Error('invalid remote response');
+   const text=message.text.trim().slice(0,800);
    if(!text)throw Error('invalid remote response');
    return {speaker,text,emotion:allowedEmotions.has(message.emotion)?message.emotion:'calm'};
   });
@@ -62,6 +64,6 @@ export function remoteRequest(state,userMessage,speaker,context,turn=null){
  const characters={};
  for(const id of new Set(plan))if(context?.characters?.[id])characters[id]=context.characters[id];
  return {speaker,userMessage:String(userMessage??'').slice(0,600),turn:conversationPlan,
-  context:{...context,conversation:context?.conversation,characters,companion:context?.companion??null,
+  context:{...context,characterMemoryBySpeaker:Object.fromEntries([...new Set(plan)].map(id=>[id,new CharacterMemoryRouter().route(state,{speaker:id,topic:context?.companion?.openThread?.topic??'',relatedId:context?.companion?.openThread?.relatedMaterialId??null,limit:2})])),conversation:context?.conversation,characters,companion:context?.companion??null,
    request:{conversationDepth:state.conversation?.depth??'NORMAL',selectedSpeaker:speaker,conversationPlan,causalOrder:true,reason:turn?.reason??null}}};
 }
