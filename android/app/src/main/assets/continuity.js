@@ -27,7 +27,7 @@ export function openThread(s,fields,now){
  // updates the existing thread instead of stacking a new one.
  const id=fields.id?clip(fields.id,120):`thread:${topic}`;
  const existing=s.openThreads.find(t=>t.id===id);
- if(existing){existing.updatedAt=now;existing.lastTouchedAt=now;return existing}
+ if(existing){if([ThreadStatus.RESOLVED,ThreadStatus.ABANDONED,ThreadStatus.EXPIRED].includes(existing.status)){existing.previousStatus=existing.status;existing.reopenedAt=now;existing.status=ThreadStatus.OPEN;existing.resurfaceCount=0;existing.cooldownUntil=0;existing.lastResurfacedAt=0;existing.expiresAt=now+THREAD_TTL;}existing.updatedAt=now;existing.lastTouchedAt=now;return existing}
  const thread={id,topic,summary:clip(fields.summary??topic,200),createdAt:now,updatedAt:now,lastTouchedAt:now,
   source:Object.values(ThreadSource).includes(fields.source)?fields.source:ThreadSource.STUCK,
   owner:fields.owner==='NurseT'?'NurseT':'SAYO',participants:Array.isArray(fields.participants)?fields.participants.filter(x=>['SAYO','NurseT'].includes(x)).slice(0,2):['SAYO'],
