@@ -92,11 +92,13 @@ export function markThreadResurfaced(thread,now){thread.lastResurfacedAt=now;thr
 export function abandonThread(s,id,now){const t=(s.openThreads??[]).find(x=>x.id===id);if(t){t.status=ThreadStatus.ABANDONED;t.updatedAt=now}return t??null}
 
 /** Resurfacing copy — grounded in the stored thread, never invented. */
-export function threadMessages(thread){
+export function threadMessages(thread,now=null,offset=540){
  const owner=thread.owner==='NurseT'?'NurseT':'SAYO';
  const other=owner==='SAYO'?'NurseT':'SAYO';
  const topic=thread.topic;
- const line=thread.source===ThreadSource.POSTPONE?`そういや、${topic}の話、あとでって言ってたよね。`:`そういや昨日の${topic}、あれどうなった？`;
+ const age=now===null?1:Math.floor((now+offset*60000)/86400000)-Math.floor((thread.createdAt+offset*60000)/86400000);
+ const when=age===1?'昨日の':age===0?'さっきの':'前に話した';
+ const line=thread.source===ThreadSource.POSTPONE?`そういや、${topic}の話、あとでって言ってたよね。`:`そういや${when}${topic}、あれどうなった？`;
  return [{speaker:owner,text:line},{speaker:other,text:owner==='SAYO'?'気になってた。':'記録では未解決のままです。'}];
 }
 

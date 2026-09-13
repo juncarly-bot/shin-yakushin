@@ -12,8 +12,8 @@ const HOUR=3600; // seconds: metrics().seconds is authoritative study seconds
 /** Derived only from authoritative metrics; no separate bond state. */
 export function relationshipStage(m){
  const days=Number(m?.studyDays??0),seconds=Number(m?.seconds??0);
- if(days>=21||seconds>=40*HOUR)return 'close';
- if(days>=7||seconds>=12*HOUR)return 'familiar';
+ if(days>=21)return 'close';
+ if(days>=7)return 'familiar';
  if(days>=2||seconds>=2*HOUR)return 'acquainted';
  return 'new';
 }

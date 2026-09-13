@@ -19,7 +19,7 @@ const find=(s,kind,id)=>(s[kind]??[]).find(x=>x.id===id);
 /** Does the authoritative state still support this interpretation? */
 export function verifyAuthority(s,ref){
  if(!ref)return true;
- if(ref.kind==='session')return s.sessions.some(x=>x.sessionId===ref.id&&x.endTimestamp!==null);
+ if(ref.kind==='session')return s.sessions.some(x=>x.sessionId===ref.id&&x.endTimestamp!==null&&(ref.endTimestamp===undefined||x.endTimestamp===ref.endTimestamp)&&(ref.studySeconds===undefined||x.segments.filter(p=>p.kind==='study').reduce((n,p)=>n+Math.max(0,(p.end??x.endTimestamp)-p.start)/1000,0)===ref.studySeconds));
  if(ref.kind==='material'){const m=find(s,'materials',ref.id);return Boolean(m&&!m.archived&&(ref.minProgress===undefined||m.progress>=ref.minProgress))}
  if(ref.kind==='goal'){const g=find(s,'goals',ref.id);return Boolean(g&&!g.archived&&(ref.done===undefined||(g.target>0&&g.progress>=g.target)===ref.done))}
  if(ref.kind==='commitment')return (s.commitments??[]).some(x=>x.commitmentId===ref.id&&(ref.status===undefined||x.status===ref.status));
@@ -83,7 +83,7 @@ export function noteFinishedSession(s,session,now,{material=null}={}){
  const seconds=segments.reduce((total,p)=>total+Math.max(0,(p.end??session.endTimestamp)-p.start)/1000,0);
  const minutes=Math.floor(seconds/60);
  const title=clip(material?.title??session.title??'学習',60);
- const authority={kind:'session',id:session.sessionId};
+ const authority={kind:'session',id:session.sessionId,endTimestamp:session.endTimestamp,studySeconds:seconds};
  const shared=addShared(s,{id:`session:${session.sessionId}`,kind:'SESSION',text:`${title}を${minutes}分取り組んだ`,relatedId:session.sessionId,authority,importance:3,timestamp:now},now);
  const characters=[];
  const sayo=addCharacterMemory(s,'SAYO',{id:`SAYO:session:${session.sessionId}`,text:segments.length>=2?'続けて取り組めていたね':'短くても戻ってきたね',relatedId:session.sessionId,authority,importance:2,timestamp:now},now);

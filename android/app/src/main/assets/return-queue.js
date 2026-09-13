@@ -1,3 +1,4 @@
+import {verifyAuthority} from './character-memory.js';
 /**
  * ReturnQueue: some useful observations are saved for a later, more natural
  * moment instead of being dumped immediately. One delivery per item, grounded
@@ -17,13 +18,13 @@ export function enqueueReturn(s,item,now){
   expiresAt:Number.isFinite(item.expiresAt)?item.expiresAt:now+3*DAY,
   speakerPreference:item.speakerPreference==='SAYO'?'SAYO':'NurseT',
   importance:Number.isFinite(item.importance)?item.importance:50,deliveredAt:null,
-  relatedMaterialId:item.relatedMaterialId??null,relatedGoalId:item.relatedGoalId??null,relatedCommitmentId:item.relatedCommitmentId??null};
+  authority:item.authority??null,relatedMaterialId:item.relatedMaterialId??null,relatedGoalId:item.relatedGoalId??null,relatedCommitmentId:item.relatedCommitmentId??null};
  s.returnQueue=[...s.returnQueue,record].slice(-MAX_RETURNS);
  return record;
 }
 
 export function dueReturn(s,now){
- const open=(s.returnQueue??[]).filter(x=>x.deliveredAt===null&&x.availableAfter<=now&&now<(x.expiresAt??Infinity));
+ const open=(s.returnQueue??[]).filter(x=>x.deliveredAt===null&&verifyAuthority(s,x.authority)&&x.availableAfter<=now&&now<(x.expiresAt??Infinity));
  open.sort((a,b)=>(b.importance??0)-(a.importance??0)||(a.createdAt??0)-(b.createdAt??0)||String(a.id).localeCompare(String(b.id)));
  return open[0]??null;
 }
@@ -51,11 +52,12 @@ export function sessionHalves(session){
  const halves=sessionHalves(session);
  if(!halves)return null;
  const total=halves.total;
+ const authority={kind:'session',id:session.sessionId,endTimestamp:session.endTimestamp,studySeconds:total};
  if(total<20*60)return null;
  // A single continuous block has no meaningful back/front pattern.
  if(halves.segments<2)return null;
- if(halves.second>=600&&halves.second>=halves.first*1.2)return {kind:ReturnKind.PATTERN,summary:'後半の方が集中が長く続いていたね',speakerPreference:'NurseT',importance:60,relatedMaterialId:session.relatedMaterialId??null};
- if(halves.first>=600&&halves.first>=halves.second*1.5)return {kind:ReturnKind.PATTERN,summary:'前半でしっかり進んでいたね',speakerPreference:'SAYO',importance:50,relatedMaterialId:session.relatedMaterialId??null};
+ if(halves.second>=600&&halves.second>=halves.first*1.2)return {id:`return:session:${session.sessionId}`,authority,kind:ReturnKind.PATTERN,summary:'後半の方が集中が長く続いていたね',speakerPreference:'NurseT',importance:60,relatedMaterialId:session.relatedMaterialId??null};
+ if(halves.first>=600&&halves.first>=halves.second*1.5)return {id:`return:session:${session.sessionId}`,authority,kind:ReturnKind.PATTERN,summary:'前半でしっかり進んでいたね',speakerPreference:'SAYO',importance:50,relatedMaterialId:session.relatedMaterialId??null};
  return null;
 }
 
@@ -67,9 +69,11 @@ export function nextMorning(now,offset){
  return at;
 }
 
-export function returnMessages(item){
+export function returnMessages(item,now=null,offset=540){
  const speaker=item.speakerPreference==='SAYO'?'SAYO':'NurseT',other=speaker==='SAYO'?'NurseT':'SAYO';
- const first=speaker==='SAYO'?`昨日、${item.summary}`:`昨日は${item.summary}。`;
+ const yesterday=now===null||Number.isFinite(item.createdAt)&&Math.floor((now+offset*60000)/DAY)-Math.floor((item.createdAt+offset*60000)/DAY)===1;
+ const when=yesterday?'昨日':'前の記録では';
+ const first=speaker==='SAYO'?`${when}、${item.summary}`:`${when}${yesterday?'は':''}${item.summary.replace(/いたね$/,'いました')}。`;
  // The second line is a reaction to the first, never a second summary of it.
  const second=speaker==='SAYO'?'うん、なんかそうだったよね。':'うん、なんかそんな感じだった。';
  return [{speaker,text:first},{speaker:other,text:second}];

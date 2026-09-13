@@ -69,12 +69,12 @@ function commitmentProposal(s,commitment,now,offset){
 /** Pure evaluation. Returns an InitiativeProposal or null; never mutates. */
 function returnProposal(s,item,now,offset){
  return proposal({id:`DEFERRED_RETURN:${item.id}`,kind:InitiativeKind.DEFERRED_RETURN,createdAt:now,speakerPlan:[item.speakerPreference],
-  reason:'deferred-return',title:item.summary,returnId:item.id,messages:returnMessages(item),actionOptions:[],expiresAt:item.expiresAt,priority:90});
+  reason:'deferred-return',title:item.summary,returnId:item.id,messages:returnMessages(item,now,s.settings.utcOffsetMinutes),actionOptions:[],expiresAt:item.expiresAt,priority:90});
 }
 function threadProposal(s,thread,now,offset){
  const owner=thread.owner==='NurseT'?'NurseT':'SAYO';
  return proposal({id:`OPEN_THREAD:${thread.id}`,kind:InitiativeKind.OPEN_THREAD_FOLLOWUP,createdAt:now,speakerPlan:[owner],
-  reason:'open-thread',title:thread.topic,threadId:thread.id,messages:threadMessages(thread),
+  reason:'open-thread',title:thread.topic,threadId:thread.id,messages:threadMessages(thread,now,s.settings.utcOffsetMinutes),
   actionOptions:[{id:'review',kind:ActionKind.REVIEW,label:'続きを話す'},{id:'later',kind:ActionKind.SNOOZE,label:'あとで',minutes:60}],
   expiresAt:now+12*HOUR,priority:55,relatedMaterialId:thread.relatedMaterialId??null,relatedTaskId:thread.relatedTaskId??null,relatedGoalId:thread.relatedGoalId??null});
 }
