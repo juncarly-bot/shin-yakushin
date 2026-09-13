@@ -21,9 +21,9 @@ export function verifyAuthority(s,ref){
  if(!ref)return true;
  if(ref.kind==='session')return s.sessions.some(x=>x.sessionId===ref.id&&x.endTimestamp!==null);
  if(ref.kind==='material'){const m=find(s,'materials',ref.id);return Boolean(m&&!m.archived&&(ref.minProgress===undefined||m.progress>=ref.minProgress))}
- if(ref.kind==='goal'){const g=find(s,'goals',ref.id);return Boolean(g&&!g.archived&&(ref.done===undefined||g.done===ref.done))}
+ if(ref.kind==='goal'){const g=find(s,'goals',ref.id);return Boolean(g&&!g.archived&&(ref.done===undefined||(g.target>0&&g.progress>=g.target)===ref.done))}
  if(ref.kind==='commitment')return (s.commitments??[]).some(x=>x.commitmentId===ref.id&&(ref.status===undefined||x.status===ref.status));
- return true;
+ return false;
 }
 
 export function addShared(s,fields,now){
@@ -62,6 +62,8 @@ export function interpretation(s,memory){
  */
 export class CharacterMemoryRouter{
  route(s,{speaker='SAYO',topic='',relatedId=null,limit=2}={}){
+  limit=Number.isFinite(limit)?Math.max(0,Math.min(3,Math.floor(limit))):2;
+  if(!['SAYO','NurseT'].includes(speaker))return {speaker,shared:[],own:[]};
   const relevant=m=>{
    if(!verifyAuthority(s,m.authority))return false;
    if(relatedId&&m.relatedId===relatedId)return true;
@@ -82,12 +84,12 @@ export function noteFinishedSession(s,session,now,{material=null}={}){
  const minutes=Math.floor(seconds/60);
  const title=clip(material?.title??session.title??'学習',60);
  const authority={kind:'session',id:session.sessionId};
- const shared=addShared(s,{kind:'SESSION',text:`${title}を${minutes}分取り組んだ`,relatedId:session.sessionId,authority,importance:3,timestamp:now},now);
+ const shared=addShared(s,{id:`session:${session.sessionId}`,kind:'SESSION',text:`${title}を${minutes}分取り組んだ`,relatedId:session.sessionId,authority,importance:3,timestamp:now},now);
  const characters=[];
- const sayo=addCharacterMemory(s,'SAYO',{text:segments.length>=2?'続けて取り組めていたね':'短くても戻ってきたね',relatedId:session.sessionId,authority,importance:2,timestamp:now},now);
+ const sayo=addCharacterMemory(s,'SAYO',{id:`SAYO:session:${session.sessionId}`,text:segments.length>=2?'続けて取り組めていたね':'短くても戻ってきたね',relatedId:session.sessionId,authority,importance:2,timestamp:now},now);
  if(sayo)characters.push(sayo);
  const goalIsComplete=Boolean(material&&material.target>0&&material.progress>=material.target);
- const nurse=addCharacterMemory(s,'NurseT',{text:goalIsComplete?'記録上は目標に届いています':'次に続く記録が残りました',relatedId:session.sessionId,authority,importance:2,timestamp:now},now);
+ const nurse=addCharacterMemory(s,'NurseT',{id:`NurseT:session:${session.sessionId}`,text:goalIsComplete?'記録上は目標に届いています':'次に続く記録が残りました',relatedId:session.sessionId,authority,importance:2,timestamp:now},now);
  if(nurse)characters.push(nurse);
  return {shared,characters};
 }

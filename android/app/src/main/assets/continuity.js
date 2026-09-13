@@ -57,28 +57,20 @@ export function detectThread(s,text,now,topic=null){
 }
 
 export function resolveThreads(s,text,now){
- if(!RESOLVE.test(clip(text,200)))return [];
+ if(!RESOLVE.test(clip(text,200))||/まだ|ない|ません|けど|しかし/.test(clip(text,200)))return [];
  const resolved=[];
  for(const t of [...(s.openThreads??[])].reverse()){
   if(t.status!==ThreadStatus.OPEN&&t.status!==ThreadStatus.WAITING)continue;
   if(t.topic&&clip(text,200).includes(t.topic)){t.status=ThreadStatus.RESOLVED;t.updatedAt=now;resolved.push(t);break}
- }
- if(!resolved.length){
-  const t=[...(s.openThreads??[])].reverse().find(t=>t.status===ThreadStatus.OPEN||t.status===ThreadStatus.WAITING);
-  if(t){t.status=ThreadStatus.RESOLVED;t.updatedAt=now;resolved.push(t)}
  }
  return resolved;
 }
 
 /** A meaningful study on the related material resolves its open thread. */
 export function resolveThreadsForStudy(s,session,now){
- if(!session||session.endTimestamp===null)return [];
- const resolved=[];
- for(const t of s.openThreads??[]){
-  if(t.status!==ThreadStatus.OPEN&&t.status!==ThreadStatus.WAITING)continue;
-  if(t.relatedMaterialId&&session.relatedMaterialId===t.relatedMaterialId&&t.resurfaceCount>0){t.status=ThreadStatus.RESOLVED;t.updatedAt=now;resolved.push(t)}
- }
- return resolved;
+ // Time spent on a material is not evidence that a conceptual difficulty is solved.
+ // Only the user's explicit topic-specific acknowledgement closes it.
+ return [];
 }
 
 /** Choose the single thread worth resurfacing now, respecting every guard. */

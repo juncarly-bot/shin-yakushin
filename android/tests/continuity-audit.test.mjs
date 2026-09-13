@@ -1,0 +1,14 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {fresh} from '../app/src/main/assets/domain.js';
+import {CharacterMemoryRouter,addShared,verifyAuthority,noteFinishedSession} from '../app/src/main/assets/character-memory.js';
+import {openThread,resolveThreads,resolveThreadsForStudy} from '../app/src/main/assets/continuity.js';
+import {companionContinuity} from '../app/src/main/assets/companion.js';
+import {decide,ConversationMode} from '../app/src/main/assets/character-decision.js';
+const T=1789200000000;
+test('memory route enforces a hard bound even for hostile limits and owner names',()=>{const s=fresh();for(let i=0;i<20;i++)addShared(s,{id:String(i),text:'fact'},T);const r=new CharacterMemoryRouter();for(const limit of [Infinity,1000,-1,NaN])assert.ok(r.route(s,{limit}).shared.length<=3);assert.deepEqual(r.route(s,{speaker:'SHARED'}).own,[])});
+test('goal authority uses actual progress and unknown authority cannot ground memory',()=>{const s=fresh();s.goals=[{id:'g',progress:10,target:10,archived:false}];assert.equal(verifyAuthority(s,{kind:'goal',id:'g',done:true}),true);s.goals[0].progress=4;assert.equal(verifyAuthority(s,{kind:'goal',id:'g',done:true}),false);assert.equal(verifyAuthority(s,{kind:'invented',id:'g'}),false)});
+test('repeated session-memory bookkeeping does not duplicate history',()=>{const s=fresh(),session={sessionId:'s',title:'本',endTimestamp:T+600000,segments:[{kind:'study',start:T,end:T+600000}]};s.sessions=[session];noteFinishedSession(s,session,T+600000);noteFinishedSession(s,session,T+700000);assert.equal(s.sharedMemories.length,1);assert.equal(s.characterMemories.SAYO.length,1);assert.equal(s.characterMemories.NurseT.length,1)});
+test('ambiguous acknowledgement and negated understanding leave unresolved topics intact',()=>{const s=fresh();openThread(s,{topic:'境界条件'},T);openThread(s,{topic:'電磁気'},T+1);for(const text of ['分かった','境界条件はまだ理解できない','境界条件は解決していない'])assert.equal(resolveThreads(s,text,T+2).length,0);assert.equal(resolveThreads(s,'境界条件が分かった',T+3).length,1);assert.equal(s.openThreads[1].status,'OPEN')});
+test('studying a related book never manufactures conceptual resolution',()=>{const s=fresh();const t=openThread(s,{topic:'境界条件',relatedMaterialId:'m'},T);t.resurfaceCount=1;resolveThreadsForStudy(s,{endTimestamp:T+10,relatedMaterialId:'m'},T+10);assert.equal(t.status,'OPEN')});
+test('assembling remote continuity cannot mutate local expiry state',()=>{const s=fresh();openThread(s,{topic:'古い話',expiresAt:T+1},T);const before=JSON.stringify(s);assert.equal(companionContinuity(s,T+2).openThread,null);assert.equal(JSON.stringify(s),before)});
+test('ordinary chat remains casual even after a productive day',()=>{const d=decide({mode:ConversationMode.CASUAL,studyMinutes:100,lateNight:false},'SAYO');assert.equal(d.recommendation.kind,'CHAT')});

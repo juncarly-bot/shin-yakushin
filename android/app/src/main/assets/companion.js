@@ -22,7 +22,7 @@ export function previousStudy(s){for(const x of [...s.sessions].filter(x=>x.endT
 export function companionContinuity(s,now,speaker='SAYO'){
  const proposal=s.initiative?.activeProposal??null;
  const live=proposal?.threadId?(s.openThreads??[]).find(x=>x.id===proposal.threadId)??null:null;
- const thread=live??selectThread(s,now);
+ const thread=live??selectThread(structuredClone(s),now);
  const commitment=proposal?.commitmentId?(s.commitments??[]).find(c=>c.commitmentId===proposal.commitmentId)??null:null;
  const deferred=dueReturn(s,now);
  const stage=relationshipStage(metrics(s,now));

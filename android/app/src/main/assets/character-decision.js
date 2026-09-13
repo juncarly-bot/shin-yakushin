@@ -113,7 +113,7 @@ export function decide(situation,id){
   if(mode===ConversationMode.REVIEW)return decision('recall','REVIEW','pleased');
   if(mode===ConversationMode.PLANNING)return decision('enthuse','START','pleased',{minutes:15});
   if(situation.stuck)return decision('next-step','CONTINUE','focused');
-  if(mode===ConversationMode.CASUAL&&!situation.studyMinutes)return decision('chat','CHAT','calm');
+  if(mode===ConversationMode.CASUAL)return decision('chat','CHAT','calm');
   return decision('small-start','START','focused',{minutes:15});
  }
  if(situation.activeStudy&&situation.activeMinutes>=90)return decision('suggest-break','BREAK','calm',{minutes:10});
