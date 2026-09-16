@@ -4,7 +4,12 @@ import {createOpenAIReaction} from '../backend/openai-client.mjs';
 import {createServer} from '../backend/server.mjs';
 
 const request = {speaker: 'SAYO', userMessage: 'PRIVATE_MESSAGE_SENTINEL', context: {memory: 'PRIVATE_CONTEXT_SENTINEL'}};
-const reaction = {text: 'PRIVATE_OUTPUT_SENTINEL', emotion: 'pleased', event: 'conversation'};
+// The reaction keeps its legacy text/emotion/event fields and now also carries the
+// plan-authoritative `messages` bundle. Both are pinned in full so the wire contract
+// stays strict instead of being asserted as a subset.
+const reaction = {text: 'PRIVATE_OUTPUT_SENTINEL', emotion: 'pleased', event: 'conversation',
+  messages: [{speaker: 'SAYO', text: 'PRIVATE_OUTPUT_SENTINEL', emotion: 'pleased'}]};
+const reactionFor = speaker => ({...reaction, messages: [{speaker, text: 'PRIVATE_OUTPUT_SENTINEL', emotion: 'pleased'}]});
 const completed = {
   status: 'completed', model: 'gpt-5-mini-2025-08-07', store: false,
   incomplete_details: null, max_output_tokens: 1200,
@@ -30,7 +35,10 @@ test('SAYO and NurseT preserve structured output, store=false and reaction contr
         return mock(completed)();
       }
     });
-    assert.deepEqual(result, reaction);
+    assert.deepEqual(result, reactionFor(speaker));
+    // The local plan stays authoritative: one planned speaker means one message.
+    assert.equal(result.messages.length, 1);
+    assert.equal(result.text, result.messages[0].text);
   }
 });
 
@@ -96,7 +104,7 @@ test('HTTP health, success, failure envelope and input validation', async () => 
     for (const speaker of ['SAYO', 'NurseT']) {
       const res = await post({...request, speaker});
       assert.equal(res.status, 200);
-      assert.deepEqual(await res.json(), {ok: true, reaction});
+      assert.deepEqual(await res.json(), {ok: true, reaction: reactionFor(speaker)});
     }
     upstream = {...completed, output: []};
     const failed = await post(request);

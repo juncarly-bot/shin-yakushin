@@ -26,8 +26,16 @@ never add request bodies, headers, API error messages or generated text to logs.
 ## HTTP contract
 
 - `GET /healthz`: `{ok: true, remoteAvailable: boolean}` (Secret presence, not an API probe).
-- `POST /v1/reactions`: `{speaker: "SAYO" | "NurseT", userMessage: string, context: object}`.
-- Success: HTTP 200, `{ok: true, reaction: {text, emotion, event}}`.
+- `POST /v1/reactions`: `{speaker: "SAYO" | "NurseT", userMessage: string, context: object,
+  turn?: {order: ("SAYO" | "NurseT")[]}}`. The Android client sends one speaker per request
+  and includes the local `turn` plan plus `context.previousLines`.
+- Success: HTTP 200, `{ok: true, reaction: {text, emotion, event, messages: [{speaker, text, emotion}]}}`.
+  `messages` is the shared-room bundle; `text`/`emotion`/`event` are kept coherent with
+  `messages[0]` so older clients still work. The `turn` plan is authoritative: the model
+  may never add a speaker, reorder the plan, or exceed three messages.
+- `context.previousLines` is what makes the second companion causal. When it is present and
+  non-empty the request is told what the earlier companion actually said; when it is absent
+  or empty the causal instruction is omitted rather than invented.
 - Failure: `{ok: false, error: code}`, preserving the Render/LocalRules fallback contract.
 - OpenAI HTTP 429, including insufficient quota: HTTP 503 / `upstream_rate_limited`.
 - Timeout: HTTP 504 / `upstream_timeout`. Incomplete or invalid output: HTTP 503 /
