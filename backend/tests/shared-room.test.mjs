@@ -86,7 +86,13 @@ test('both companions are briefed with the same shared-room rules', async () => 
   const rules = [
     /ここはユーザー・小夜・ナースロボ＿タイプＴが同じ部屋で話している会話です/,
     /質問は会話を続ける既定の手段ではありません/,
-    /二人ともユーザーに質問してはいけません/,
+    // Goal 14 replaced the absolute "neither companion may ask the USER anything"
+    // ban. That ban left NurseT with no licensed move on a tiny remark, and the
+    // model escaped the dead end by copying the previous line verbatim. The room
+    // still refuses the *duplicate* question; it no longer forbids questions.
+    /一人目が質問したら、二人目は同じことを聞かずに自分の考えや反応を足してください/,
+    /ユーザーの言葉や相手の発言をそのまま繰り返さないでください/,
+    /小さな感想・気づいたこと・連想・好み・別の理由での同意・軽い反対・不確かさのどれか/,
     /同じ内容を順番に言うパネル討論のような形にしないでください/,
     /意見を無理に分けないでください/,
     /学習の話題でないときに学習や行動を促さないでください/
@@ -182,4 +188,96 @@ test('the Worker returns the same multi-speaker bundle as the Render server', as
     assert.deepEqual((await response.json()).reaction, workerReaction);
   } finally { await new Promise(resolve => server.close(resolve)); }
   assert.deepEqual(workerReaction.messages.map(m => m.speaker), ['SAYO', 'NurseT']);
+});
+
+/**
+ * Goal 14 - the bounded echo guard.
+ *
+ * Measured before this change: NurseT returned the USER's sentence or SAYO's
+ * sentence byte-identical in 30 of 98 audited turns, and the client refuses a
+ * whole bundle whose only candidate echoed. The guard re-asks at most once with a
+ * strengthened instruction and keeps the better answer. It never edits prose, so
+ * the remote-only invariant is untouched.
+ */
+async function echoRun(request, samples) {
+  const bodies = [];
+  const replies = [...samples];
+  const result = await createOpenAIReaction(request, {apiKey: 'PRIVATE_KEY_SENTINEL',
+    fetchImpl: async (url, init) => {
+      bodies.push(JSON.parse(init.body));
+      const next = replies.length > 1 ? replies.shift() : replies[0];
+      return typeof next === 'function' ? next() : upstream(next)();
+    }});
+  return {bodies, result};
+}
+
+test('a first answer that repeats the USER verbatim is re-asked once and replaced', async () => {
+  const request = {speaker: 'NurseT', userMessage: '猫いた', turn: plan(['NurseT']), context: {previousLines: []}};
+  const {bodies, result} = await echoRun(request, [
+    [{speaker: 'NurseT', text: '猫いた', emotion: 'calm'}],
+    [{speaker: 'NurseT', text: '猫は見かけるだけで、ちょっと得した感じがしますね', emotion: 'relaxed'}]
+  ]);
+  assert.equal(bodies.length, 2, 'exactly one bounded re-ask');
+  assert.equal(result.messages[0].text, '猫は見かけるだけで、ちょっと得した感じがしますね');
+  // The base prompt is unchanged; the retry only appends the stronger rule.
+  assert.equal(bodies[1].instructions.startsWith(bodies[0].instructions), true);
+  assert.match(bodies[1].instructions, /そのまま繰り返していました/);
+});
+
+test('a first answer that repeats the earlier companion is re-asked and replaced', async () => {
+  const previousLines = [{speaker: 'SAYO', text: 'そういう日、あるよね。無理しなくていいよ。'}];
+  const request = {speaker: 'NurseT', userMessage: '今日は何もしたくない', turn: plan(['NurseT']), context: {previousLines}};
+  const {bodies, result} = await echoRun(request, [
+    [{speaker: 'NurseT', text: 'そういう日、あるよね。無理しなくていいよ。', emotion: 'calm'}],
+    [{speaker: 'NurseT', text: '私も、そういう日は予定をひとつ消します', emotion: 'relaxed'}]
+  ]);
+  assert.equal(bodies.length, 2);
+  assert.equal(result.messages[0].text, '私も、そういう日は予定をひとつ消します');
+});
+
+test('an echoing answer is never lost to a second echo, an upstream failure or an abort', async () => {
+  const request = {speaker: 'NurseT', userMessage: '空がきれい', turn: plan(['NurseT']), context: {previousLines: []}};
+  const echo = [{speaker: 'NurseT', text: '空がきれい', emotion: 'calm'}];
+  const both = await echoRun(request, [echo, echo]);
+  assert.equal(both.result.messages[0].text, '空がきれい', 'a second echo leaves the original in place');
+  const failed = await echoRun(request, [echo, async () =>
+    new Response('{"ok":false}', {status: 500, headers: {'content-type': 'application/json'}})]);
+  assert.equal(failed.result.messages[0].text, '空がきれい', 'a failed re-ask must not lose the working answer');
+  const aborted = await echoRun(request, [echo, async () => { const error = new Error('aborted'); error.name = 'AbortError'; throw error; }]);
+  assert.equal(aborted.result.messages[0].text, '空がきれい', 'an aborted re-ask must not lose the working answer');
+});
+
+test('a contributing answer costs exactly one upstream call, so the common turn is unchanged', async () => {
+  const request = {speaker: 'NurseT', userMessage: '猫いた', turn: plan(['NurseT']), context: {previousLines: []}};
+  const {bodies, result} = await echoRun(request, [[{speaker: 'NurseT', text: 'ふわふわの子だった？', emotion: 'pleased'}]]);
+  assert.equal(bodies.length, 1, 'no extra call when the first answer contributes');
+  assert.equal(result.messages[0].text, 'ふわふわの子だった？');
+});
+
+test('a minimal acknowledgement is a contribution, not an echo', async () => {
+  const request = {speaker: 'NurseT', userMessage: '猫いた', turn: plan(['NurseT']), context: {previousLines: []}};
+  const {bodies, result} = await echoRun(request, [[{speaker: 'NurseT', text: 'それはいいですね。', emotion: 'relaxed'}]]);
+  assert.equal(bodies.length, 1, 'a short acknowledgement is never re-asked');
+  assert.equal(result.messages[0].text, 'それはいいですね。');
+});
+
+test('the echo guard catches punctuation and whitespace differences, not paraphrase', async () => {
+  const request = {speaker: 'NurseT', userMessage: '猫いた', turn: plan(['NurseT']), context: {previousLines: []}};
+  const {bodies} = await echoRun(request, [
+    [{speaker: 'NurseT', text: ' 猫いた。 ', emotion: 'calm'}],
+    [{speaker: 'NurseT', text: '猫がいたんだ', emotion: 'pleased'}]
+  ]);
+  assert.equal(bodies.length, 2, 'punctuation-only difference still counts as a verbatim echo');
+});
+
+test('NurseT is licensed positive moves and the absolute question ban is gone', async () => {
+  const {captured} = await run({speaker: 'NurseT', userMessage: '猫いた', turn: plan(['NurseT']), context: {}},
+    [{speaker: 'NurseT', text: 'a', emotion: 'calm'}]);
+  // The dead end Goal 14 removed: an absolute ban with no licensed alternative.
+  assert.doesNotMatch(captured.instructions, /二人ともユーザーに質問してはいけません/);
+  assert.match(captured.instructions, /ユーザーの言葉や相手の発言をそのまま繰り返さないでください/);
+  assert.match(captured.instructions, /小さな好みや感想/);
+  // The rules that cut casual over-coaching from 8 to 1 must stay in place.
+  assert.match(captured.instructions, /学習の話題でないときに学習や行動を促さないでください/);
+  assert.match(captured.instructions, /次に何をするかの提案を毎回しないでください/);
 });
