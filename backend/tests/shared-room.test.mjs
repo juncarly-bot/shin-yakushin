@@ -95,7 +95,13 @@ test('both companions are briefed with the same shared-room rules', async () => 
     /小さな感想・気づいたこと・連想・好み・別の理由での同意・軽い反対・不確かさのどれか/,
     /同じ内容を順番に言うパネル討論のような形にしないでください/,
     /意見を無理に分けないでください/,
-    /学習の話題でないときに学習や行動を促さないでください/
+    /学習の話題でないときに学習や行動を促さないでください/,
+    // Goal 15 closed the first-line coaching gap the Goal 14 audit could not see:
+    // nobody looked at line 1, and `眠い` came back as rest advice in all four
+    // stored passes. A stated condition is conversation, not a help request.
+    /体調や気分をひとこと言っただけのときは/,
+    /休憩・睡眠・水分・ストレッチ・体調の話は/,
+    /選択肢を並べて聞き返す質問を、毎回しないでください/
   ];
   const seen = [];
   for (const speaker of ['SAYO', 'NurseT']) {
@@ -221,7 +227,8 @@ test('a first answer that repeats the USER verbatim is re-asked once and replace
   assert.equal(result.messages[0].text, '猫は見かけるだけで、ちょっと得した感じがしますね');
   // The base prompt is unchanged; the retry only appends the stronger rule.
   assert.equal(bodies[1].instructions.startsWith(bodies[0].instructions), true);
-  assert.match(bodies[1].instructions, /そのまま繰り返していました/);
+  assert.match(bodies[1].instructions, /繰り返しただけでした/);
+  assert.match(bodies[1].instructions, /この文は使わず/);
 });
 
 test('a first answer that repeats the earlier companion is re-asked and replaced', async () => {
@@ -235,16 +242,54 @@ test('a first answer that repeats the earlier companion is re-asked and replaced
   assert.equal(result.messages[0].text, '私も、そういう日は予定をひとつ消します');
 });
 
-test('an echoing answer is never lost to a second echo, an upstream failure or an abort', async () => {
+test('an echoing answer is never lost to a persistent echo, an upstream failure or an abort', async () => {
   const request = {speaker: 'NurseT', userMessage: '空がきれい', turn: plan(['NurseT']), context: {previousLines: []}};
   const echo = [{speaker: 'NurseT', text: '空がきれい', emotion: 'calm'}];
   const both = await echoRun(request, [echo, echo]);
-  assert.equal(both.result.messages[0].text, '空がきれい', 'a second echo leaves the original in place');
+  assert.equal(both.bodies.length, 3, 'both re-asks are spent before giving up');
+  assert.equal(both.result.messages[0].text, '空がきれい', 'a persistent echo leaves the original in place');
   const failed = await echoRun(request, [echo, async () =>
     new Response('{"ok":false}', {status: 500, headers: {'content-type': 'application/json'}})]);
   assert.equal(failed.result.messages[0].text, '空がきれい', 'a failed re-ask must not lose the working answer');
   const aborted = await echoRun(request, [echo, async () => { const error = new Error('aborted'); error.name = 'AbortError'; throw error; }]);
   assert.equal(aborted.result.messages[0].text, '空がきれい', 'an aborted re-ask must not lose the working answer');
+});
+
+test('an echo that survives the first re-ask gets a second one, and that one wins', async () => {
+  const request = {speaker: 'NurseT', userMessage: '今日は自炊した', turn: plan(['NurseT']), context: {previousLines: []}};
+  const {bodies, result} = await echoRun(request, [
+    [{speaker: 'NurseT', text: '今日は自炊した', emotion: 'calm'}],
+    [{speaker: 'NurseT', text: '今日は自炊した', emotion: 'calm'}],
+    [{speaker: 'NurseT', text: '自炊、いいですね。私は汁物をひとつ足すと満足感が変わります', emotion: 'pleased'}]
+  ]);
+  assert.equal(bodies.length, 3, 'the second re-ask is reached');
+  assert.equal(result.messages[0].text, '自炊、いいですね。私は汁物をひとつ足すと満足感が変わります');
+});
+
+test('the re-ask quotes the line it is asking the model to stop copying', async () => {
+  const request = {speaker: 'NurseT', userMessage: '猫いた', turn: plan(['NurseT']), context: {previousLines: []}};
+  const previousLines = [{speaker: 'SAYO', text: 'そういう日、あるよね。無理しなくていいよ。'}];
+  const withCompanion = {speaker: 'NurseT', userMessage: '今日は何もしたくない', turn: plan(['NurseT']), context: {previousLines}};
+  const {bodies} = await echoRun(request, [
+    [{speaker: 'NurseT', text: '猫いた', emotion: 'calm'}],
+    [{speaker: 'NurseT', text: '猫は見かけるだけで得した感じがしますね', emotion: 'relaxed'}]
+  ]);
+  assert.match(bodies[1].instructions, /「猫いた」/, 'the USER echo is quoted back');
+  const companion = await echoRun(withCompanion, [
+    [{speaker: 'NurseT', text: 'そういう日、あるよね。無理しなくていいよ。', emotion: 'calm'}],
+    [{speaker: 'NurseT', text: '私も、そういう日は予定をひとつ消します', emotion: 'relaxed'}]
+  ]);
+  assert.match(companion.bodies[1].instructions, /そういう日、あるよね/, 'the companion echo is quoted back too');
+});
+
+test('the echo re-ask runs at a higher reasoning effort than the answer it repairs', async () => {
+  const request = {speaker: 'NurseT', userMessage: '猫いた', turn: plan(['NurseT']), context: {previousLines: []}};
+  const {bodies} = await echoRun(request, [
+    [{speaker: 'NurseT', text: '猫いた', emotion: 'calm'}],
+    [{speaker: 'NurseT', text: '猫は見かけるだけで得した感じがしますね', emotion: 'relaxed'}]
+  ]);
+  assert.equal(bodies[0].reasoning.effort, 'minimal', 'the common turn is unchanged');
+  assert.equal(bodies[1].reasoning.effort, 'low', 'the repair is given more room');
 });
 
 test('a contributing answer costs exactly one upstream call, so the common turn is unchanged', async () => {
@@ -280,4 +325,39 @@ test('NurseT is licensed positive moves and the absolute question ban is gone', 
   // The rules that cut casual over-coaching from 8 to 1 must stay in place.
   assert.match(captured.instructions, /学習の話題でないときに学習や行動を促さないでください/);
   assert.match(captured.instructions, /次に何をするかの提案を毎回しないでください/);
+});
+
+test('Goal 15: the two companions are separated by what they notice, not by register', async () => {
+  const sayo = await run({speaker: 'SAYO', userMessage: '猫いた', turn: plan(['SAYO']), context: {}},
+    [{speaker: 'SAYO', text: 'a', emotion: 'pleased'}]);
+  const tt = await run({speaker: 'NurseT', userMessage: '猫いた', turn: plan(['NurseT']), context: {}},
+    [{speaker: 'NurseT', text: 'a', emotion: 'calm'}]);
+  // The first-line coaching closure, present for BOTH speakers because either may
+  // open a casual turn.
+  assert.match(sayo.captured.instructions, /体調や気分をひとこと言っただけのときは/);
+  assert.match(sayo.captured.instructions, /休憩・睡眠・水分・ストレッチ・体調の話は/);
+  assert.match(tt.captured.instructions, /休憩・睡眠・水分・ストレッチ・体調の話は/);
+  assert.match(tt.captured.instructions, /選択肢を並べて聞き返す質問を、毎回しないでください/);
+  // Attention, not politeness, is what separates them: each identity names a
+  // different set of things, and neither carries the other's.
+  assert.match(sayo.captured.instructions, /ユーザーが楽しそうか、気分がどう動いたか/);
+  assert.match(tt.captured.instructions, /見落とされている具体点、大きさや量/);
+  assert.doesNotMatch(tt.captured.instructions, /ユーザーが楽しそうか/);
+  assert.doesNotMatch(sayo.captured.instructions, /見落とされている具体点/);
+  // NurseT keeps the Goal 14 licence to voice a small preference, but is no longer
+  // the health officer or the facilitator.
+  assert.match(tt.captured.instructions, /小さな好みや感想、軽い驚きも口にします/);
+  assert.match(tt.captured.instructions, /健康指導係でも進行役でもありません/);
+  // SAYO may end on a statement instead of a question.
+  assert.match(sayo.captured.instructions, /質問で締めなくても大丈夫です/);
+});
+
+test('Goal 15: the second speaker must not pile another piece of advice on the first', async () => {
+  const previousLines = [{speaker: 'SAYO', text: '無理しないで、少し休んだら？'}];
+  const {captured} = await run(
+    {speaker: 'NurseT', userMessage: '眠い', turn: plan(['NurseT']), context: {previousLines}},
+    [{speaker: 'NurseT', text: 'b', emotion: 'calm'}]);
+  assert.match(captured.instructions, /相手が助言や気づかいをしていたら/);
+  // The Goal 14 protection is untouched by the Goal 15 edit.
+  assert.match(captured.instructions, /相手の文をそのまま使わず、自分の言葉で足してください/);
 });
