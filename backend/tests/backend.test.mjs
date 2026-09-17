@@ -100,6 +100,14 @@ test('HTTP health, success, failure envelope and input validation', async () => 
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
     assert.deepEqual(await (await fetch(`${base}/healthz`)).json(), {ok: true, remoteAvailable: true});
+    // Which commit is serving. Without this there is no way to tell a live deploy from
+    // a pushed-but-undeployed one, because the reply-target contract only shifts
+    // generation statistically and the service exposes no other build identity.
+    const version = await (await fetch(`${base}/version`)).json();
+    assert.equal(version.ok, true);
+    assert.equal(version.service, 'shin-yakushin-remote-ai');
+    assert.ok('commit' in version && 'deployedAt' in version);
+    assert.equal(JSON.stringify(version).includes('PRIVATE_ERROR_SENTINEL'), false);
     const post = body => fetch(`${base}/v1/reactions`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(body)});
     for (const speaker of ['SAYO', 'NurseT']) {
       const res = await post({...request, speaker});

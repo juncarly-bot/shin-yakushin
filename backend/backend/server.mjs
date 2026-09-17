@@ -39,6 +39,17 @@ async function readJson(req) {
 export function createServer(dependencies = {}) {
   return http.createServer(async (req, res) => {
     if (req.method === 'GET' && req.url === '/healthz') return json(res, 200, {ok: true, remoteAvailable: Boolean(dependencies.apiKey ?? process.env.OPENAI_API_KEY)});
+    // Which code is actually serving. Render injects RENDER_GIT_COMMIT on every deploy,
+    // and without it there is no way to tell a live deploy from a pushed-but-undeployed
+    // commit: the service exposes no other build identity, and behavioural probes are
+    // ambiguous because the reply-target prompt only shifts generation statistically.
+    // Read-only, no request body, no dependency on the model provider.
+    if (req.method === 'GET' && req.url === '/version') return json(res, 200, {
+      ok: true,
+      service: 'shin-yakushin-remote-ai',
+      commit: process.env.RENDER_GIT_COMMIT ?? null,
+      deployedAt: process.env.RENDER_DEPLOY_ID ?? null
+    });
     if (req.method !== 'POST' || req.url !== '/v1/reactions') return json(res, 404, {ok: false, error: 'not_found'});
     const ip = req.socket.remoteAddress ?? 'unknown';
     if (!allowed(ip)) return json(res, 429, {ok: false, error: 'rate_limited'});
