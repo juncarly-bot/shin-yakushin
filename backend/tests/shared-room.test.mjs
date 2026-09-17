@@ -361,3 +361,39 @@ test('Goal 15: the second speaker must not pile another piece of advice on the f
   // The Goal 14 protection is untouched by the Goal 15 edit.
   assert.match(captured.instructions, /相手の文をそのまま使わず、自分の言葉で足してください/);
 });
+
+test('Goal 16: a casual remark gets a reaction first, and advice only when it is asked for', async () => {
+  const sayo = await run(
+    {speaker: 'SAYO', userMessage: '眠い', turn: plan(['SAYO']), context: {previousLines: []}},
+    [{speaker: 'SAYO', text: 'a', emotion: 'calm'}]);
+  const tt = await run(
+    {speaker: 'NurseT', userMessage: '眠い', turn: plan(['NurseT']), context: {previousLines: []}},
+    [{speaker: 'NurseT', text: 'b', emotion: 'calm'}]);
+  // The positive move comes first: notice, react, offer a view - and it is stated for
+  // both companions, because either of them can open a casual turn.
+  for (const captured of [sayo.captured, tt.captured]) {
+    assert.match(captured.instructions,
+      /まず気づいたこと・自分の反応・自分の見方のどれかを述べてください/);
+    assert.match(captured.instructions,
+      /ユーザーが助けや方法を求めたとき、または安全に関わるときだけにしてください/);
+  }
+  // NurseT is the one who reaches for the plan, so her opening move is named for her.
+  assert.match(tt.captured.instructions, /助言から始めず、まず自分が何に気づいたかを言ってください/);
+  // Advice is restricted, not banned: the rule has an explicit exception, and the
+  // Goal 15 rule that advice belongs on a study turn is still there.
+  assert.doesNotMatch(tt.captured.instructions, /助言をしないでください/);
+  assert.match(sayo.captured.instructions, /休憩・睡眠・水分・ストレッチ・体調の話は/);
+  // Nothing from Goal 15 was traded away for this.
+  assert.match(tt.captured.instructions, /見落とされている具体点、大きさや量/);
+  assert.match(tt.captured.instructions, /健康指導係でも進行役でもありません/);
+  assert.match(sayo.captured.instructions, /ユーザーが楽しそうか、気分がどう動いたか/);
+});
+
+test('Goal 16: the opening-move rule reaches the causal second position too', async () => {
+  const previousLines = [{speaker: 'SAYO', text: '猫がいたんだね。小さいのに堂々としてる。'}];
+  const {captured} = await run(
+    {speaker: 'NurseT', userMessage: '猫いた', turn: plan(['NurseT']), context: {previousLines}},
+    [{speaker: 'NurseT', text: 'b', emotion: 'calm'}]);
+  assert.match(captured.instructions, /まず気づいたこと・自分の反応・自分の見方のどれかを述べてください/);
+  assert.match(captured.instructions, /相手が助言や気づかいをしていたら/);
+});
