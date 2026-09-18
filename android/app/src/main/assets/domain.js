@@ -4,7 +4,7 @@ import {voiceSettings} from './voice-settings.js';
 import {CommitmentStatus,COMMITMENT_KINDS,COMMITMENT_STATUSES,PROACTIVITY_LEVELS,DEFAULT_MINUTES,MAX_OPEN,isOpen,isMeaningful,matchesStudy} from './commitments.js';
 import {addShared,addCharacterMemory,noteFinishedSession} from './character-memory.js';
 import {detectThread,resolveThreads,resolveThreadsForStudy,markThreadResurfaced,abandonThread} from './continuity.js';
-import {enqueueReturn,markReturnDelivered,pruneReturns} from './return-queue.js';\nimport {CharacterProfiles} from './characters.js';\nimport {freshCharacterEngine,ensureCharacterEngine} from './character-engine.js';
+import {enqueueReturn,markReturnDelivered,pruneReturns} from './return-queue.js';\nimport {CharacterProfiles} from './characters.js';\nimport {freshCharacterEngine,ensureCharacterEngine,updateProfileOverride,setRoomPresence} from './character-engine.js';
 /** Android-independent domain. v0.1 segment and identity contracts retained. */
 export const VERSION=2;
 export const kinds=['materials','goals','tasks','plans'];
@@ -146,6 +146,17 @@ export function apply(state,action,p={},now=Date.now()){
       if(p.proactivity!==undefined){if(!PROACTIVITY_LEVELS.includes(p.proactivity))fail('積極性の設定が不正です');current.proactivity=p.proactivity}
       if(p.quietDay!==undefined)current.quietDay=p.quietDay;
       s.settings.companion={proactivity:current.proactivity??'NORMAL',quietDay:current.quietDay??null};
+      break;
+    }
+ case 'characterRoom':{
+      const engine=ensureCharacterEngine(s,CharacterProfiles,now),id=p.characterId;
+      if(!['SAYO','NurseT'].includes(id))fail('キャラクターが見つかりません');
+      if(p.op==='profile'){updateProfileOverride(engine,id,p.patch??{});event='characterRoom';context={op:'profile',characterId:id}}
+      else if(p.op==='invite'){if(!setRoomPresence(engine,id,true,now))fail(engine.characters[id].life.state==='SLEEP'?'今は休んでいます':'部屋が満員です');event='characterRoom';context={op:'invite',characterId:id}}
+      else if(p.op==='exit'){setRoomPresence(engine,id,false,now);event='characterRoom';context={op:'exit',characterId:id}}
+      else if(p.op==='dismissSeed'){const seed=(engine.characters[id].seeds??[]).find(v=>v.id===p.seedId);if(seed)seed.status='dismissed';event='characterRoom';context={op:'dismissSeed',characterId:id}}
+      else if(p.op==='resetProfile'){delete engine.profileOverrides[id];event='characterRoom';context={op:'resetProfile',characterId:id}}
+      else fail('キャラクター操作が不正です');
       break;
     }
  case 'memoryVault':{
