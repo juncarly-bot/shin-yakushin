@@ -2,7 +2,9 @@ import {upsertDaily} from './life-balance-analytics.js';
 import {chatResolution,appendTimeline,validateMessages} from './timeline.js';
 import {resolveConversation,updateConversation} from './conversation.js';
 import {fresh,validate,migrate,apply,metrics} from './domain.js';
-import {ReactionDirector} from './companion.js';\nimport {CharacterProfiles} from './characters.js';\nimport {noteCharacterTurn} from './character-engine.js';
+import {ReactionDirector} from './companion.js';
+import {CharacterProfiles} from './characters.js';
+import {noteCharacterTurn} from './character-engine.js';
 /** Local bookkeeping commands that must not spawn an ambient reaction bubble. */
 const META_ACTIONS=new Set(['initiativeShow','initiative','commitment','commitmentAction','commitmentMaintenance','companion','characterRoom']);
 /** Native store is authoritative. No localStorage/IndexedDB silent fallback. */
