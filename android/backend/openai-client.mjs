@@ -35,20 +35,26 @@ function instructionsFor(speaker, turn, context = {}) {
     ? 'あなたは小夜/SAYO。日常的で親しみがあり、短く自然な日本語で話します。'
     : 'あなたはナースロボ＿タイプＴ。落ち着いた言葉で、休憩・ケア・振り返りに役立つ視点を添えます。';
   const names = id => id === 'SAYO' ? '小夜' : 'ナースロボ＿タイプＴ';
-  const runtime = context?.characterEngine && typeof context.characterEngine === 'object' ? context.characterEngine : null;
-  const speech = runtime?.speech ?? {};
-  const tendencies = speech?.tendencies ?? {};
-  const characterContract = runtime ? [
-    `Current conversation act: ${runtime.conversationAct ?? 'personal_reaction'}.`,
-    `Current mood: ${runtime.mood?.label ?? 'CALM'}; valence ${runtime.mood?.valence ?? 50}, energy ${runtime.mood?.energy ?? 50}, social energy ${runtime.mood?.socialEnergy ?? 50}.`,
-    `Relationship to USER: familiarity ${runtime.relationship?.familiarity ?? 0}, affection ${runtime.relationship?.affection ?? 0}, trust ${runtime.relationship?.trust ?? 0}, comfort ${runtime.relationship?.comfort ?? 0}, tension ${runtime.relationship?.tension ?? 0}.`,
-    `Topic: ${runtime.knowledge?.topic ?? 'casual'}; interest ${runtime.knowledge?.interest ?? 0}; expertise ${runtime.knowledge?.expertise ?? 0}; allowed knowledge depth ${runtime.knowledge?.depth ?? 0}/4; access ${runtime.knowledge?.access ?? 'UNKNOWN'}.`,
-    `Speech first person: ${speech.firstPerson ?? '私'}. Politeness ${tendencies.politeness ?? 50}, warmth ${tendencies.warmth ?? 50}, directness ${tendencies.directness ?? 50}, playfulness ${tendencies.playfulness ?? 50}.`,
-    `Speech hard rules: ${JSON.stringify((speech.hardRules ?? []).slice(0,10))}.`,
-    `Speech habits: ${JSON.stringify((speech.habits ?? []).slice(0,8))}.`,
-    `Relevant speech examples: ${JSON.stringify((speech.examples ?? []).slice(0,4))}.`,
-    'Do not exceed the allowed knowledge depth. If knowledge access is UNKNOWN or expertise is low, prefer a question, reaction, or uncertainty over inventing expertise.'
-  ].join('\n') : '';
+  const runtimes = context?.characterEngines && typeof context.characterEngines === 'object' ? context.characterEngines : {};
+  if (context?.characterEngine && !runtimes[speaker]) runtimes[speaker] = context.characterEngine;
+  const contractFor = id => {
+    const runtime = runtimes[id];
+    if (!runtime) return '';
+    const speech = runtime?.speech ?? {};
+    const tendencies = speech?.tendencies ?? {};
+    return [
+      `Character ${id} conversation act: ${runtime.conversationAct ?? 'personal_reaction'}.`,
+      `Character ${id} mood: ${runtime.mood?.label ?? 'CALM'}; valence ${runtime.mood?.valence ?? 50}, energy ${runtime.mood?.energy ?? 50}, social energy ${runtime.mood?.socialEnergy ?? 50}.`,
+      `Character ${id} relationship to USER: familiarity ${runtime.relationship?.familiarity ?? 0}, affection ${runtime.relationship?.affection ?? 0}, trust ${runtime.relationship?.trust ?? 0}, comfort ${runtime.relationship?.comfort ?? 0}, tension ${runtime.relationship?.tension ?? 0}.`,
+      `Character ${id} topic: ${runtime.knowledge?.topic ?? 'casual'}; interest ${runtime.knowledge?.interest ?? 0}; expertise ${runtime.knowledge?.expertise ?? 0}; allowed knowledge depth ${runtime.knowledge?.depth ?? 0}/4; access ${runtime.knowledge?.access ?? 'UNKNOWN'}.`,
+      `Character ${id} speech first person: ${speech.firstPerson ?? '私'}. Politeness ${tendencies.politeness ?? 50}, warmth ${tendencies.warmth ?? 50}, directness ${tendencies.directness ?? 50}, playfulness ${tendencies.playfulness ?? 50}.`,
+      `Character ${id} speech hard rules: ${JSON.stringify((speech.hardRules ?? []).slice(0,10))}.`,
+      `Character ${id} speech habits: ${JSON.stringify((speech.habits ?? []).slice(0,8))}.`,
+      `Character ${id} relevant speech examples: ${JSON.stringify((speech.examples ?? []).slice(0,4))}.`,
+      `For ${id}, do not exceed its allowed knowledge depth. If access is UNKNOWN or expertise is low, prefer a question, reaction, or uncertainty over invented expertise.`
+    ].join('\n');
+  };
+  const characterContract = turn.order.map(contractFor).filter(Boolean).join('\n');
   const plan = turn.order.length > 1
     ? `今回は${turn.order.map(names).join('→')}の順で${turn.order.length}人が話します。messagesに、この話者と順番どおりに${turn.order.length}件入れてください。`
       +`messages[1]はmessages[0]を実際に読んだ後の発言として書いてください。messages[2]があればmessages[0]とmessages[1]の両方を踏まえてください。`
