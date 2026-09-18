@@ -11,7 +11,7 @@ import {VERSION,migrate,metrics,totals} from './domain.js';
 const isObject=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const list=x=>Array.isArray(x)?x:[];
 const escaped=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const freshKeys=Object.freeze(['schemaVersion','revision','sessions','materials','goals','tasks','plans','memories','visits','progressEvents','dialogueHistory','reaction','settings','lastSeen','messages','conversation','lifeBalanceAnalytics','commitments','initiativeStats','initiative','sharedMemories','characterMemories','openThreads','returnQueue']);
+const freshKeys=Object.freeze(['schemaVersion','revision','sessions','materials','goals','tasks','plans','memories','visits','progressEvents','dialogueHistory','reaction','settings','lastSeen','messages','conversation','lifeBalanceAnalytics','commitments','initiativeStats','initiative','sharedMemories','characterMemories','openThreads','returnQueue','characterEngine']);
 
 function emptyReport(meta){
  return {fileName:meta.name??null,sourceFormat:meta.format??null,sourceSha256:meta.sha256??null,sourceBytes:Number.isFinite(meta.bytes)?meta.bytes:null,
