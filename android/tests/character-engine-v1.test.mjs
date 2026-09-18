@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {freshCharacterEngine,ensureCharacterEngine,applyInteractionEvents,relationshipFor,resolveLifeState,analyzeConversation,resolveInterestExpertise,knowledgeDepth,chooseConversationAct,presenceDecision,noteCharacterTurn,buildCharacterRuntime,updateProfileOverride,effectiveCharacterProfile,setRoomPresence} from '../app/src/main/assets/character-engine.js';
 import {CharacterProfiles} from '../app/src/main/assets/characters.js';
+import {addShared,CharacterMemoryRouter} from '../app/src/main/assets/character-memory.js';
 
 test('fresh engine keeps max four and current two residents',()=>{const e=freshCharacterEngine(CharacterProfiles,1);assert.equal(e.room.maxActive,4);assert.deepEqual(e.room.participants,['SAYO','NurseT']);assert.equal(e.characters.SAYO.life.state,'FREE')});
 test('migration is additive and idempotent',()=>{const s={};const a=ensureCharacterEngine(s,CharacterProfiles,1);a.characters.SAYO.mood.valence=77;const b=ensureCharacterEngine(s,CharacterProfiles,2);assert.equal(b.characters.SAYO.mood.valence,77);assert.equal(b.version,1)});
@@ -17,3 +18,5 @@ test('runtime carries speech relationship mood act and knowledge',()=>{const s={
 
 test('profile overrides are separate from immutable defaults',()=>{const e=freshCharacterEngine(CharacterProfiles,1);updateProfileOverride(e,'SAYO',{personality:{initiative:12},speechStyle:{identity:{firstPerson:'わたし'}}});const p=effectiveCharacterProfile(e,CharacterProfiles,'SAYO');assert.equal(p.personality.initiative,12);assert.equal(p.speechStyle.identity.firstPerson,'わたし');assert.equal(CharacterProfiles.SAYO.personality.initiative,68)});
 test('room presence enforces sleep and room state',()=>{const e=freshCharacterEngine(CharacterProfiles,1);setRoomPresence(e,'SAYO',false,2);assert.equal(e.characters.SAYO.presence.roomState,'OUT');e.characters.SAYO.life.state='SLEEP';assert.equal(setRoomPresence(e,'SAYO',true,3),false);e.characters.SAYO.life.state='FREE';assert.equal(setRoomPresence(e,'SAYO',true,4),true)});
+
+test('knownBy prevents memory telepathy between characters',()=>{const s={sharedMemories:[],characterMemories:{SAYO:[],NurseT:[]},sessions:[],materials:[],goals:[],commitments:[]};addShared(s,{id:'private-sayo',kind:'FACT',text:'物理の相談',knownBy:['SAYO'],importance:5},1);const router=new CharacterMemoryRouter();assert.equal(router.route(s,{speaker:'SAYO'}).shared.length,1);assert.equal(router.route(s,{speaker:'NurseT'}).shared.length,0)});
