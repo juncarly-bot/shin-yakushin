@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {freshCharacterEngine,ensureCharacterEngine,applyInteractionEvents,relationshipFor,resolveLifeState,analyzeConversation,resolveInterestExpertise,knowledgeDepth,chooseConversationAct,presenceDecision,noteCharacterTurn,buildCharacterRuntime} from '../app/src/main/assets/character-engine.js';
+import {freshCharacterEngine,ensureCharacterEngine,applyInteractionEvents,relationshipFor,resolveLifeState,analyzeConversation,resolveInterestExpertise,knowledgeDepth,chooseConversationAct,presenceDecision,noteCharacterTurn,buildCharacterRuntime,updateProfileOverride,effectiveCharacterProfile,setRoomPresence} from '../app/src/main/assets/character-engine.js';
 import {CharacterProfiles} from '../app/src/main/assets/characters.js';
 
 test('fresh engine keeps max four and current two residents',()=>{const e=freshCharacterEngine(CharacterProfiles,1);assert.equal(e.room.maxActive,4);assert.deepEqual(e.room.participants,['SAYO','NurseT']);assert.equal(e.characters.SAYO.life.state,'FREE')});
@@ -14,3 +14,6 @@ test('low expertise can prefer question over knowledge',()=>{const e=freshCharac
 test('sleeping character cannot enter room',()=>{const e=freshCharacterEngine(CharacterProfiles,1);e.characters.SAYO.life.state='SLEEP';e.characters.SAYO.presence.roomState='OUT';assert.equal(presenceDecision(e,CharacterProfiles,'SAYO').eligible,false)});
 test('turn updates runtime without touching arbitrary domain facts',()=>{const s={marker:{keep:true}};noteCharacterTurn(s,CharacterProfiles,{userMessage:'物理の話をしよう',messages:[{speaker:'SAYO',text:'うん'}],now:10});assert.equal(s.marker.keep,true);assert.equal(s.characterEngine.room.topic.root,'physics');assert.ok(s.characterEngine.recentActs.length)});
 test('runtime carries speech relationship mood act and knowledge',()=>{const s={};const r=buildCharacterRuntime(s,CharacterProfiles,'SAYO','物理を詳しく教えて',100,{userAskedDeep:true});assert.equal(r.speaker,'SAYO');assert.ok(r.speech);assert.ok(r.relationship);assert.ok(r.mood);assert.ok(r.conversationAct);assert.equal(r.knowledge.topic,'physics')});
+
+test('profile overrides are separate from immutable defaults',()=>{const e=freshCharacterEngine(CharacterProfiles,1);updateProfileOverride(e,'SAYO',{personality:{initiative:12},speechStyle:{identity:{firstPerson:'わたし'}}});const p=effectiveCharacterProfile(e,CharacterProfiles,'SAYO');assert.equal(p.personality.initiative,12);assert.equal(p.speechStyle.identity.firstPerson,'わたし');assert.equal(CharacterProfiles.SAYO.personality.initiative,68)});
+test('room presence enforces sleep and room state',()=>{const e=freshCharacterEngine(CharacterProfiles,1);setRoomPresence(e,'SAYO',false,2);assert.equal(e.characters.SAYO.presence.roomState,'OUT');e.characters.SAYO.life.state='SLEEP';assert.equal(setRoomPresence(e,'SAYO',true,3),false);e.characters.SAYO.life.state='FREE';assert.equal(setRoomPresence(e,'SAYO',true,4),true)});
