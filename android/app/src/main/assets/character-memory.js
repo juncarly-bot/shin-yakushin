@@ -32,7 +32,7 @@ export function addShared(s,fields,now){
  const id=clip(fields.id,120)||`shared:${fields.kind??'FACT'}:${text.slice(0,40)}:${now}`;
  if(s.sharedMemories.some(m=>m.id===id))return null;
  const record={id,kind:MEMORY_KINDS.includes(fields.kind)?fields.kind:'FACT',text,timestamp:fields.timestamp??now,
-  importance:Number.isFinite(fields.importance)?fields.importance:3,relatedId:fields.relatedId??null,authority:fields.authority??null};
+  importance:Number.isFinite(fields.importance)?fields.importance:3,relatedId:fields.relatedId??null,authority:fields.authority??null,participants:Array.isArray(fields.participants)?fields.participants.slice(0,8):[],knownBy:Array.isArray(fields.knownBy)?[...new Set(fields.knownBy)].slice(0,8):null,topics:Array.isArray(fields.topics)?fields.topics.map(x=>clip(x,60)).filter(Boolean).slice(0,8):[],emotion:clip(fields.emotion??'',40)||null,sourceEventId:clip(fields.sourceEventId??'',120)||null};
  s.sharedMemories=[...s.sharedMemories,record].slice(-MAX_SHARED);
  return record;
 }
@@ -45,7 +45,7 @@ export function addCharacterMemory(s,who,fields,now){
  const id=clip(fields.id,120)||`${who}:${fields.relatedId??text.slice(0,30)}:${now}`;
  if(list.some(m=>m.id===id))return null;
  const record={id,text,timestamp:fields.timestamp??now,importance:Number.isFinite(fields.importance)?fields.importance:3,
-  relatedId:fields.relatedId??null,authority:fields.authority??null};
+  relatedId:fields.relatedId??null,authority:fields.authority??null,participants:Array.isArray(fields.participants)?fields.participants.slice(0,8):[],knownBy:Array.isArray(fields.knownBy)?[...new Set(fields.knownBy)].slice(0,8):[who],topics:Array.isArray(fields.topics)?fields.topics.map(x=>clip(x,60)).filter(Boolean).slice(0,8):[],emotion:clip(fields.emotion??'',40)||null,sourceEventId:clip(fields.sourceEventId??'',120)||null};
  s.characterMemories[who]=[...list,record].slice(-MAX_CHARACTER);
  return record;
 }
@@ -71,7 +71,7 @@ export class CharacterMemoryRouter{
    return !relatedId&&!topic;
   };
   const rank=(a,b)=>(b.importance??0)-(a.importance??0)||(b.timestamp??0)-(a.timestamp??0);
-  const pick=list=>[...list].filter(relevant).sort(rank).slice(0,limit).map(m=>({id:m.id,text:m.text,kind:m.kind??'IMPRESSION',relatedId:m.relatedId??null}));
+  const pick=list=>[...list].filter(relevant).sort(rank).slice(0,limit).map(m=>({id:m.id,text:m.text,kind:m.kind??'IMPRESSION',relatedId:m.relatedId??null,topics:m.topics??[],emotion:m.emotion??null,sourceEventId:m.sourceEventId??null}));
   return {speaker,shared:pick(s.sharedMemories??[]),own:pick((s.characterMemories??{})[speaker]??[])};
  }
 }
@@ -92,4 +92,13 @@ export function noteFinishedSession(s,session,now,{material=null}={}){
  const nurse=addCharacterMemory(s,'NurseT',{id:`NurseT:session:${session.sessionId}`,text:goalIsComplete?'記録上は目標に届いています':'次に続く記録が残りました',relatedId:session.sessionId,authority,importance:2,timestamp:now},now);
  if(nurse)characters.push(nurse);
  return {shared,characters};
+}
+
+
+/** Character Room Lab memory candidate created from an observed interaction. */
+export function addInteractionMemory(s,event,summary,now,{importance=4}={}){
+ if(!event||!summary)return null;
+ const knownBy=Array.isArray(event.observedBy)?event.observedBy.filter(x=>x==='SAYO'||x==='NurseT'):[];
+ if(!knownBy.length)return null;
+ return addShared(s,{kind:'FACT',text:clip(summary,200),importance,participants:[event.actor,event.target].filter(Boolean),knownBy,topics:event.topic?[event.topic]:[],sourceEventId:event.id??null},now);
 }
