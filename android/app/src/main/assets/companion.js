@@ -7,7 +7,7 @@ import {entertainmentBudget} from './life-balance.js';
 import {CharacterMemoryRouter} from './character-memory.js';
 import {selectThread} from './continuity.js';
 import {dueReturn} from './return-queue.js';
-import {relationshipStage,relationshipVoice} from './relationship.js';
+import {relationshipStage,relationshipVoice} from './relationship.js';\nimport {buildCharacterRuntime} from './character-engine.js';
 export {voiceSettings,voiceDefaults} from './voice-settings.js';
 import {voiceSettings} from './voice-settings.js';
 export function inQuietHours(v,now,offset){const h=new Date(now+offset*60000).getUTCHours();return v.quietHours&&(v.quietStart===v.quietEnd|| (v.quietStart<v.quietEnd?h>=v.quietStart&&h<v.quietEnd:h>=v.quietStart||h<v.quietEnd))}
@@ -34,7 +34,7 @@ export function companionContinuity(s,now,speaker='SAYO'){
   relationship:{stage,voice:relationshipVoice(stage)}};
 }
 export class ContextAssembler {
- assemble(s,now,userMessage='',{speaker='SAYO'}={}){const current=active(s),d=dateKey(now,s.settings.utcOffsetMinutes),lb=s.settings.lifeBalance||{},mode=lb.dailyMode||'NORMAL';const used=Number(lb.entertainmentUsedMinutes||0);return structuredClone({weeklyUsage:weeklyContext(s.lifeBalanceAnalytics,weekStart(now,userMessage.startsWith('先週')),{enabled:lb.usageInConversation!==false,relevant:isWeeklyQuestion(userMessage)}),conversation:stateOf(s,now),characters:CharacterProfiles,currentStudy:current,material:entity(s,'materials',current?.relatedMaterialId),goal:entity(s,'goals',current?.relatedGoalId),task:entity(s,'tasks',current?.relatedTaskId),today:report(s,now,d,d),week:report(s,now,shiftDate(d,-6),d),recentSessions:s.sessions.slice(-3),selectedMemory:[...s.memories].sort((a,b)=>b.importance-a.importance).slice(0,3),relationship:metrics(s,now),companion:companionContinuity(s,now,speaker),dailyUsage:lb.usageInConversation===false?null:{mode,budget:entertainmentBudget(mode,used,lb.budgetMinutes),studyGoalMinutes:Number(lb.studyGoalMinutes||0),studyCompletedMinutes:Math.floor(report(s,now,d,d).seconds/60)}})}
+ assemble(s,now,userMessage='',{speaker='SAYO'}={}){const current=active(s),d=dateKey(now,s.settings.utcOffsetMinutes),lb=s.settings.lifeBalance||{},mode=lb.dailyMode||'NORMAL';const used=Number(lb.entertainmentUsedMinutes||0);return structuredClone({weeklyUsage:weeklyContext(s.lifeBalanceAnalytics,weekStart(now,userMessage.startsWith('先週')),{enabled:lb.usageInConversation!==false,relevant:isWeeklyQuestion(userMessage)}),conversation:stateOf(s,now),characters:CharacterProfiles,currentStudy:current,material:entity(s,'materials',current?.relatedMaterialId),goal:entity(s,'goals',current?.relatedGoalId),task:entity(s,'tasks',current?.relatedTaskId),today:report(s,now,d,d),week:report(s,now,shiftDate(d,-6),d),recentSessions:s.sessions.slice(-3),selectedMemory:[...s.memories].sort((a,b)=>b.importance-a.importance).slice(0,3),relationship:metrics(s,now),characterEngine:buildCharacterRuntime(structuredClone(s),CharacterProfiles,speaker,userMessage,now,{userAskedDeep:/詳しく|深く|掘り下げ/.test(userMessage)}),companion:companionContinuity(s,now,speaker),dailyUsage:lb.usageInConversation===false?null:{mode,budget:entertainmentBudget(mode,used,lb.budgetMinutes),studyGoalMinutes:Number(lb.studyGoalMinutes||0),studyCompletedMinutes:Math.floor(report(s,now,d,d).seconds/60)}})}
 }
 /** Future providers generate intent only; never receive writable domain state. */
 export class DialogueProvider {async generate(context){throw Error('Provider unavailable')}}
