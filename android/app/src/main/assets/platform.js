@@ -4,7 +4,7 @@ import {resolveConversation,updateConversation} from './conversation.js';
 import {fresh,validate,migrate,apply,metrics} from './domain.js';
 import {ReactionDirector} from './companion.js';\nimport {CharacterProfiles} from './characters.js';\nimport {noteCharacterTurn} from './character-engine.js';
 /** Local bookkeeping commands that must not spawn an ambient reaction bubble. */
-const META_ACTIONS=new Set(['initiativeShow','initiative','commitment','commitmentAction','commitmentMaintenance','companion']);
+const META_ACTIONS=new Set(['initiativeShow','initiative','commitment','commitmentAction','commitmentMaintenance','companion','characterRoom']);
 /** Native store is authoritative. No localStorage/IndexedDB silent fallback. */
 export class StudyApplication {
  constructor(host,clock=()=>Date.now()){this.host=host;this.clock=clock;this.provider=new ReactionDirector();this.state=null;this.warning='';}
