@@ -87,7 +87,7 @@ async function enhanceConversation(localMessages,userMessage,previous){
  const turn=++remoteTurn;showTyping(plan.order);latency.mark('remote_request_started_at');
  const stage=setTimeout(()=>{if(pendingTyping){pendingTyping.text='接続先の起動を待っています。';const t=document.querySelector('.typing .typing-text');if(t)t.textContent=pendingTyping.text}},8000);
  try{
-  const context=new ContextAssembler().assemble(S,now(),userMessage,{speaker:targets[0].speaker}),result=await remoteAI.generate(remoteRequest(S,userMessage,targets[0].speaker,context,plan));
+  const context=new ContextAssembler().assemble(S,now(),userMessage,{speaker:targets[0].speaker,speakers:plan.order}),result=await remoteAI.generate(remoteRequest(S,userMessage,targets[0].speaker,context,plan));
   if(turn!==remoteTurn||!S.settings.remoteAI)return;
   latency.mark('remote_first_response_at');latency.mark('remote_response_completed_at');
   const remote=result.messages??[{text:result.text,emotion:result.emotion}],filled=targets.map((local,index)=>remote[index]??{speaker:local.speaker,text:local.text});
