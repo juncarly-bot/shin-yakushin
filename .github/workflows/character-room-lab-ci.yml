@@ -1,0 +1,25 @@
+name: Character Room Lab CI
+
+on:
+  push:
+    branches:
+      - android-v08-character-room-lab
+  pull_request:
+    branches:
+      - android-v08-character-continuity
+
+jobs:
+  node-contracts:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax checks
+        run: npm run check
+      - name: Regression tests
+        run: npm test
