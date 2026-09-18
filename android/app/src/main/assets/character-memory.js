@@ -66,6 +66,7 @@ export class CharacterMemoryRouter{
   if(!['SAYO','NurseT'].includes(speaker))return {speaker,shared:[],own:[]};
   const relevant=m=>{
    if(!verifyAuthority(s,m.authority))return false;
+   if(Array.isArray(m.knownBy)&&m.knownBy.length&&!m.knownBy.includes(speaker))return false;
    if(relatedId&&m.relatedId===relatedId)return true;
    if(topic&&String(m.text).includes(topic))return true;
    return !relatedId&&!topic;
