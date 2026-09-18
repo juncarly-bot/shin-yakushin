@@ -5,6 +5,8 @@ import {CommitmentStatus,COMMITMENT_KINDS,COMMITMENT_STATUSES,PROACTIVITY_LEVELS
 import {addShared,addCharacterMemory,noteFinishedSession} from './character-memory.js';
 import {detectThread,resolveThreads,resolveThreadsForStudy,markThreadResurfaced,abandonThread} from './continuity.js';
 import {enqueueReturn,markReturnDelivered,pruneReturns} from './return-queue.js';
+import {CharacterProfiles} from './characters.js';
+import {freshCharacterEngine,ensureCharacterEngine,updateProfileOverride,setRoomPresence,effectiveCharacterProfiles,updateLifeAndPresence} from './character-engine.js';
 /** Android-independent domain. v0.1 segment and identity contracts retained. */
 export const VERSION=2;
 export const kinds=['materials','goals','tasks','plans'];
@@ -20,7 +22,7 @@ const uuid=()=>crypto.randomUUID();
 export const dateKey=(t,offset=540)=>new Date(t+offset*60000).toISOString().slice(0,10);
 export const dateMs=(d,offset=540)=>{if(typeof d!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(d))fail('日付が不正です');const t=Date.parse(d+'T00:00:00Z');if(!Number.isFinite(t)||new Date(t).toISOString().slice(0,10)!==d)fail('日付が不正です');return t-offset*60000};
 export const shiftDate=(d,n)=>dateKey(dateMs(d,0)+n*86400000,0);
-export const fresh=()=>({schemaVersion:VERSION,revision:0,sessions:[],materials:[],goals:[],tasks:[],plans:[],memories:[],visits:[],progressEvents:[],dialogueHistory:{},reaction:null,commitments:[],sharedMemories:[],characterMemories:{SAYO:[],NurseT:[]},openThreads:[],returnQueue:[],initiativeStats:{shown:0,accepted:0,declined:0,snoozed:0,completed:0},initiative:{lastPromptAt:0,lastKind:null,lastRelatedId:null,lastDeclinedAt:0,lastDeclinedKind:null,shownDay:null,shownCount:0,snoozeUntil:0,activeProposal:null},settings:{name:'',utcOffsetMinutes:540,breakMinutes:5,quiet:false,notifications:false,remoteAI:false,companion:{proactivity:'NORMAL',quietDay:null},lifeBalance:{dailyMode:'NORMAL',budgetMinutes:{NORMAL:90,HOLIDAY:180,FOCUS:60},interventionLevel:'NORMAL',cooldownMinutes:120,usageInConversation:true,usageNotifications:true,appCategories:{}}},lastSeen:null});
+export const fresh=()=>({schemaVersion:VERSION,revision:0,characterEngine:freshCharacterEngine(CharacterProfiles,0),sessions:[],materials:[],goals:[],tasks:[],plans:[],memories:[],visits:[],progressEvents:[],dialogueHistory:{},reaction:null,commitments:[],sharedMemories:[],characterMemories:{SAYO:[],NurseT:[]},openThreads:[],returnQueue:[],initiativeStats:{shown:0,accepted:0,declined:0,snoozed:0,completed:0},initiative:{lastPromptAt:0,lastKind:null,lastRelatedId:null,lastDeclinedAt:0,lastDeclinedKind:null,shownDay:null,shownCount:0,snoozeUntil:0,activeProposal:null},settings:{name:'',utcOffsetMinutes:540,breakMinutes:5,quiet:false,notifications:false,remoteAI:false,companion:{proactivity:'NORMAL',quietDay:null},lifeBalance:{dailyMode:'NORMAL',budgetMinutes:{NORMAL:90,HOLIDAY:180,FOCUS:60},interventionLevel:'NORMAL',cooldownMinutes:120,usageInConversation:true,usageNotifications:true,appCategories:{}}},lastSeen:null});
 export const active=s=>s.sessions.find(x=>x.endTimestamp===null);
 export const entity=(s,k,id)=>s[k].find(x=>x.id===id);
 export function totals(x,now){const r={study:0,break:0,pause:0};for(const p of x.segments)r[p.kind]+=Math.max(0,(p.end??now)-p.start)/1000;return r}
@@ -38,6 +40,7 @@ export function report(s,now,start,end,filter={}){
 export function metrics(s,now){let seconds=0,reward=0;const days=new Set();for(const x of s.sessions){if(x.endTimestamp===null)continue;const v=totals(x,now).study;seconds+=v;reward+=Math.floor(v/60);for(const p of x.segments){if(p.kind!=='study'||p.end<=p.start)continue;let a=dateKey(p.start,s.settings.utcOffsetMinutes),b=dateKey(p.end-1,s.settings.utcOffsetMinutes);while(a<=b){days.add(a);a=shiftDate(a,1)}}}let streak=0,c=dateKey(now,s.settings.utcOffsetMinutes);if(!days.has(c))c=shiftDate(c,-1);while(days.has(c)){streak++;c=shiftDate(c,-1)}return {seconds,reward,studyBond:Math.round(seconds/36)/100,studyDays:days.size,streak,familiarity:s.visits.length,sharedMemories:s.memories.length}}
 export function validate(s,allowedVersion=VERSION){
  validateConversation(s.conversation,s);
+ ensureCharacterEngine(s,CharacterProfiles,0);
  // Additive companion-continuity fields: old saves load with safe defaults.
  for(const key of ['sharedMemories','openThreads','returnQueue'])if(s[key]===undefined||s[key]===null)s[key]=[];
  if(s.characterMemories===undefined||s.characterMemories===null||typeof s.characterMemories!=='object'||Array.isArray(s.characterMemories))s.characterMemories={SAYO:[],NurseT:[]};
@@ -146,6 +149,17 @@ export function apply(state,action,p={},now=Date.now()){
       if(p.proactivity!==undefined){if(!PROACTIVITY_LEVELS.includes(p.proactivity))fail('積極性の設定が不正です');current.proactivity=p.proactivity}
       if(p.quietDay!==undefined)current.quietDay=p.quietDay;
       s.settings.companion={proactivity:current.proactivity??'NORMAL',quietDay:current.quietDay??null};
+      break;
+    }
+ case 'characterRoom':{
+      const engine=ensureCharacterEngine(s,CharacterProfiles,now),runtimeProfiles=effectiveCharacterProfiles(engine,CharacterProfiles),id=p.characterId;updateLifeAndPresence(engine,runtimeProfiles,now,s.settings.utcOffsetMinutes);
+      if(!['SAYO','NurseT'].includes(id))fail('キャラクターが見つかりません');
+      if(p.op==='profile'){updateProfileOverride(engine,id,p.patch??{});event='characterRoom';context={op:'profile',characterId:id}}
+      else if(p.op==='invite'){if(!setRoomPresence(engine,id,true,now))fail(engine.characters[id].life.state==='SLEEP'?'今は休んでいます':'部屋が満員です');event='characterRoom';context={op:'invite',characterId:id}}
+      else if(p.op==='exit'){setRoomPresence(engine,id,false,now);event='characterRoom';context={op:'exit',characterId:id}}
+      else if(p.op==='dismissSeed'){const seed=(engine.characters[id].seeds??[]).find(v=>v.id===p.seedId);if(seed)seed.status='dismissed';event='characterRoom';context={op:'dismissSeed',characterId:id}}
+      else if(p.op==='resetProfile'){delete engine.profileOverrides[id];event='characterRoom';context={op:'resetProfile',characterId:id}}
+      else fail('キャラクター操作が不正です');
       break;
     }
  case 'memoryVault':{

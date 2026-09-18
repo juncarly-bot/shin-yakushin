@@ -5,6 +5,8 @@ import {composeDialogue} from './dialogue.js';
 import {relationshipStage,relationshipVoice} from './relationship.js';
 import {guardStructure,structureKey} from './repetition.js';
 import {selectThread} from './continuity.js';
+import {CharacterProfiles} from './characters.js';
+import {directorPlan} from './character-engine.js';
 
 export {ConversationPlan,CastPlan} from './cast-director.js';
 export {ConversationMode} from './character-decision.js';
@@ -69,13 +71,30 @@ function useLead(situation,decision,reaction){
  return explicit||neutral;
 }
 
+function planForOrder(order){
+ if(!order.length)return ConversationPlan.NONE;
+ if(order.length===1)return order[0]==='SAYO'?ConversationPlan.SAYO_ONLY:ConversationPlan.T_ONLY;
+ if(order.length===2)return order[0]==='SAYO'?ConversationPlan.SAYO_THEN_T:ConversationPlan.T_THEN_SAYO;
+ return ConversationPlan.SHORT_GROUP_EXCHANGE;
+}
+function roomAwareCast(s,cast,text){
+ const engine=s.characterEngine;if(!engine?.characters)return cast;
+ const available=id=>engine.characters?.[id]?.life?.state!=='SLEEP'&&engine.characters?.[id]?.presence?.roomState!=='OUT';
+ let order=cast.order.filter(available).filter((id,index,list)=>index===0||id!==list[index-1]);
+ if(cast.reason==='default'){
+  const hint=directorPlan(engine,CharacterProfiles,{userMessage:text,directAddress:directAddress(text),userAskedDeep:/詳しく|深く|掘り下げ/.test(text)});
+  const hinted=hint.order.filter(available);if(hinted.length)order=hinted;
+ }
+ return {...cast,order,maxMessages:order.length,plan:planForOrder(order),reason:cast.reason==='default'?'character-engine':cast.reason};
+}
+
 /** Chooses participation only. Study and memory remain authoritative elsewhere. */
 export function conversationPlan(s,event,resolution,now){
  if(!s.reaction?.text)return ConversationPlan.NONE;
  const situation=buildSituation(s,now,{text:resolution?.text??'',event});
  const {thread,commitment}=liveProposalParts(s);
  const depth=s.conversation?.depthContext?.depth;
- const cast=castPlan(situation,{address:directAddress(resolution?.text??''),event,depth,thread,commitment,recent:recentSpeakers(s),speaker:s.reaction?.speaker});
+ const cast=roomAwareCast(s,castPlan(situation,{address:directAddress(resolution?.text??''),event,depth,thread,commitment,recent:recentSpeakers(s),speaker:s.reaction?.speaker}),resolution?.text??'');
  return cast.plan;
 }
 
@@ -85,7 +104,7 @@ export function orchestrateConversation(s,event,resolution,now){
  const situation=buildSituation(s,now,{text,event});
  const {thread,commitment}=liveProposalParts(s);
  const depth=s.conversation?.depthContext?.depth;
- const cast=castPlan(situation,{address:directAddress(text),event,depth,thread,commitment,recent:recentSpeakers(s),speaker:s.reaction?.speaker});
+ const cast=roomAwareCast(s,castPlan(situation,{address:directAddress(text),event,depth,thread,commitment,recent:recentSpeakers(s),speaker:s.reaction?.speaker}),text);
  if(cast.plan===ConversationPlan.NONE)return [];
  const decisions=decideBoth(situation);
  let order=cast.order;

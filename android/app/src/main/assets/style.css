@@ -59,3 +59,14 @@
 .debug-marks>div strong{font-size:10px;font-weight:600}
 .debug-migration{margin-top:12px}
 @media(max-width:360px){.debug-tool{grid-template-columns:1fr}.debug-tool .small{width:100%}}
+
+/* Character Room Lab */
+button.avatar{padding:0;min-height:0;cursor:pointer;overflow:hidden}
+.character-heading{display:flex;align-items:center;gap:12px;min-width:0}
+.character-heading h1,.character-heading h2{margin:0}
+.character-runtime{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0}
+.character-runtime span{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:5px 9px;font-size:11px;color:var(--muted)}
+.character-card .avatar{flex-basis:44px}
+.character-debug{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;line-height:1.55;max-height:420px;overflow:auto}
+
+.character-ie{display:grid;grid-template-columns:minmax(92px,1fr) 1fr 1fr;gap:8px;align-items:end;margin:10px 0}.character-ie>strong{align-self:center}.character-ie label{margin:0}@media(max-width:420px){.character-ie{grid-template-columns:1fr 1fr}.character-ie>strong{grid-column:1/-1}}
