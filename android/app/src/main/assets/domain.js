@@ -6,7 +6,7 @@ import {addShared,addCharacterMemory,noteFinishedSession} from './character-memo
 import {detectThread,resolveThreads,resolveThreadsForStudy,markThreadResurfaced,abandonThread} from './continuity.js';
 import {enqueueReturn,markReturnDelivered,pruneReturns} from './return-queue.js';
 import {CharacterProfiles} from './characters.js';
-import {freshCharacterEngine,ensureCharacterEngine,updateProfileOverride,setRoomPresence} from './character-engine.js';
+import {freshCharacterEngine,ensureCharacterEngine,updateProfileOverride,setRoomPresence,effectiveCharacterProfiles,updateLifeAndPresence} from './character-engine.js';
 /** Android-independent domain. v0.1 segment and identity contracts retained. */
 export const VERSION=2;
 export const kinds=['materials','goals','tasks','plans'];
@@ -152,7 +152,7 @@ export function apply(state,action,p={},now=Date.now()){
       break;
     }
  case 'characterRoom':{
-      const engine=ensureCharacterEngine(s,CharacterProfiles,now),id=p.characterId;
+      const engine=ensureCharacterEngine(s,CharacterProfiles,now),runtimeProfiles=effectiveCharacterProfiles(engine,CharacterProfiles),id=p.characterId;updateLifeAndPresence(engine,runtimeProfiles,now,s.settings.utcOffsetMinutes);
       if(!['SAYO','NurseT'].includes(id))fail('キャラクターが見つかりません');
       if(p.op==='profile'){updateProfileOverride(engine,id,p.patch??{});event='characterRoom';context={op:'profile',characterId:id}}
       else if(p.op==='invite'){if(!setRoomPresence(engine,id,true,now))fail(engine.characters[id].life.state==='SLEEP'?'今は休んでいます':'部屋が満員です');event='characterRoom';context={op:'invite',characterId:id}}
