@@ -80,7 +80,7 @@ function planForOrder(order){
 function roomAwareCast(s,cast,text){
  const engine=s.characterEngine;if(!engine?.characters)return cast;
  const available=id=>engine.characters?.[id]?.life?.state!=='SLEEP'&&engine.characters?.[id]?.presence?.roomState!=='OUT';
- let order=cast.order.filter(available);
+ let order=cast.order.filter(available).filter((id,index,list)=>index===0||id!==list[index-1]);
  if(cast.reason==='default'){
   const hint=directorPlan(engine,CharacterProfiles,{userMessage:text,directAddress:directAddress(text),userAskedDeep:/詳しく|深く|掘り下げ/.test(text)});
   const hinted=hint.order.filter(available);if(hinted.length)order=hinted;
