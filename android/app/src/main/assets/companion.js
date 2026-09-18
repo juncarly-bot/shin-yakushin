@@ -7,7 +7,8 @@ import {entertainmentBudget} from './life-balance.js';
 import {CharacterMemoryRouter} from './character-memory.js';
 import {selectThread} from './continuity.js';
 import {dueReturn} from './return-queue.js';
-import {relationshipStage,relationshipVoice} from './relationship.js';\nimport {buildCharacterRuntime} from './character-engine.js';
+import {relationshipStage,relationshipVoice} from './relationship.js';
+import {buildCharacterRuntime} from './character-engine.js';
 export {voiceSettings,voiceDefaults} from './voice-settings.js';
 import {voiceSettings} from './voice-settings.js';
 export function inQuietHours(v,now,offset){const h=new Date(now+offset*60000).getUTCHours();return v.quietHours&&(v.quietStart===v.quietEnd|| (v.quietStart<v.quietEnd?h>=v.quietStart&&h<v.quietEnd:h>=v.quietStart||h<v.quietEnd))}
