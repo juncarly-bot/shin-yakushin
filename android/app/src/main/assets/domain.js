@@ -4,7 +4,7 @@ import {voiceSettings} from './voice-settings.js';
 import {CommitmentStatus,COMMITMENT_KINDS,COMMITMENT_STATUSES,PROACTIVITY_LEVELS,DEFAULT_MINUTES,MAX_OPEN,isOpen,isMeaningful,matchesStudy} from './commitments.js';
 import {addShared,addCharacterMemory,noteFinishedSession} from './character-memory.js';
 import {detectThread,resolveThreads,resolveThreadsForStudy,markThreadResurfaced,abandonThread} from './continuity.js';
-import {enqueueReturn,markReturnDelivered,pruneReturns} from './return-queue.js';
+import {enqueueReturn,markReturnDelivered,pruneReturns} from './return-queue.js';\nimport {CharacterProfiles} from './characters.js';\nimport {freshCharacterEngine,ensureCharacterEngine} from './character-engine.js';
 /** Android-independent domain. v0.1 segment and identity contracts retained. */
 export const VERSION=2;
 export const kinds=['materials','goals','tasks','plans'];
