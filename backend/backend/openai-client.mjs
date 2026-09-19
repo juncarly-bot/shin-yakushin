@@ -50,7 +50,25 @@ function sanitizeRoomContext(context) {
       },
       speech: {register: slugString(c.speech?.register), rhythm: slugString(c.speech?.rhythm), avoid: slugStrings(c.speech?.avoid, 4)},
       relationship: {stage: ['new', 'acquainted', 'familiar', 'close'].includes(c.relationship?.stage) ? c.relationship.stage : null, toUser: slugString(c.relationship?.toUser), toOther: slugString(c.relationship?.toOther)},
-      mood: slugString(c.mood)
+      mood: slugString(c.mood),
+      // Goal 19 facets. Rebuilt key by key from the allow-lists, so the shape the
+      // model sees is this backend's, not the caller's.
+      facets: c.facets && typeof c.facets === 'object' && !Array.isArray(c.facets) ? {
+        topic: DOMAIN_KEYS.includes(c.facets.topic) ? c.facets.topic : null,
+        personality: boundedScales(c.facets.personality, SCALE_KEYS.personality),
+        behavior: boundedScales(c.facets.behavior, SCALE_KEYS.behavior),
+        speechTendencies: boundedScales(c.facets.speechTendencies, SCALE_KEYS.speechTendencies),
+        interest: boundedAxis(c.facets.interest),
+        interestGeneral: boundedAxis(c.facets.interestGeneral),
+        expertise: boundedAxis(c.facets.expertise),
+        expertiseGeneral: boundedAxis(c.facets.expertiseGeneral)
+      } : null,
+      // Life cycle: the durable window is the profile's, the current position in it
+      // is runtime. Only the derived state travels, and only as context.
+      life: c.life && typeof c.life === 'object' && !Array.isArray(c.life) ? {
+        state: ['resting-hours', 'awake-hours'].includes(c.life.state) ? c.life.state : null,
+        localTime: typeof c.life.localTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(c.life.localTime.trim()) ? c.life.localTime.trim() : null
+      } : null
     };
   } else if (context.character !== undefined) delete context.character;
   if (context.roomTurn && typeof context.roomTurn === 'object' && !Array.isArray(context.roomTurn)) {
@@ -206,6 +224,42 @@ function actStrings(value, count) {
 }
 
 /**
+ * Goal 19. The numeric half of the Character Profile.
+ *
+ * A 0-100 axis is only worth storing if something turns it into behaviour, so the
+ * allow-lists below are the *only* axes this backend will accept, and each one has a
+ * rule further down that renders it into one sentence. An axis the client invents is
+ * dropped rather than forwarded, which keeps a caller from smuggling a number that
+ * means nothing into the system message.
+ *
+ * The keys are matched by name, not by the slug rules above: `sentenceLength` and
+ * `topicChange` are camelCase and `SLUG` is lower-case-hyphenated on purpose, so
+ * validating *keys* against a value-shaped rule is exactly the mistake Goal 18 found
+ * with the relation hint. Allow-lists avoid it.
+ */
+const SCALE_KEYS = Object.freeze({
+  personality: Object.freeze(['sociability', 'initiative', 'curiosity', 'emotionality', 'humor', 'assertiveness']),
+  behavior: Object.freeze(['talkativeness', 'interruption', 'topicChange', 'silenceTolerance']),
+  speechTendencies: Object.freeze(['politeness', 'warmth', 'directness', 'sentenceLength', 'emotionalExpression', 'playfulness'])
+});
+/** The topic vocabulary Interests and Expertise share. */
+const DOMAIN_KEYS = Object.freeze(['study', 'physics', 'technology', 'cars', 'food', 'travel', 'music', 'health', 'weather', 'everyday', 'work', 'rest', 'general']);
+
+function boundedAxis(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+function boundedScales(raw, allowed) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const out = {};
+  for (const key of allowed) {
+    const value = boundedAxis(raw[key]);
+    if (value !== null) out[key] = value;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/**
  * How much conversational work is left, stated as a fact about this turn.
  *
  * This is the part that answers the defect a person hears on the device: every
@@ -220,6 +274,112 @@ const WEIGHT_RULE = Object.freeze({
   NORMAL: '今回は普通の長さで。見方とその理由をひとつずつ程度にしてください。',
   DEEP: '今回はテーマに重さがあるので、つながった考えを複数述べてかまいません。長くなってもかまいません。'
 });
+
+/**
+ * Goal 19. Why a character cares, said as a value rather than as advice.
+ *
+ * Character Core carried `values` slugs since Goal 17 and this backend never read
+ * them — a facet of the profile that reached the request and changed nothing. The
+ * statements below exist so that stops being true. Each is written as what the
+ * character *believes*, never as what the user should do: `rest-is-part-of-the-work`
+ * is a conviction about pacing, not an instruction to take a break, which is the
+ * regression Goal 17's speech profile already had to suppress once.
+ */
+const VALUE_STATEMENTS = Object.freeze({
+  'togetherness': '一緒にやっている感じを大事にしている',
+  'small-steps': '一度に大きく変えるより、小さく進むほうを重く見ている',
+  'honesty-of-mood': '気分をごまかさずに言うほうがいいと思っている',
+  'feasibility': '実際に続けられるかどうかを最初に見る',
+  'pacing': '速さより、続くペースのほうを大事にしている',
+  'evidence': '根拠のある言い方をしたほうがいいと思っている',
+  'rest-is-part-of-the-work': '休むことも含めて取り組みだと考えている'
+});
+
+/**
+ * Goal 19. One behavioural sentence per axis.
+ *
+ * Bands, not numbers, and deliberately quiet in the middle: an axis in the 34-66
+ * range produces no sentence at all, because "she is average at curiosity" is not
+ * something a line should be told. The extremes are what change wording, which is
+ * also what stops a full profile from turning into a wall of instructions.
+ */
+const HIGH = 67, LOW = 33;
+const PERSONALITY_RULES = Object.freeze({
+  sociability: v => v >= HIGH ? '人と話していること自体を好む。' : v <= LOW ? '一人でいる時間も大事にする。' : '',
+  initiative: v => v >= HIGH ? '自分から話を振ったり誘ったりする。' : v <= LOW ? '自分からは動かず、相手を待つ。' : '',
+  curiosity: v => v >= HIGH ? '知らない話題にも食いつく。' : v <= LOW ? '知らない話題には自分から深入りしない。' : '',
+  emotionality: v => v >= HIGH ? '感情が表に出やすい。' : v <= LOW ? '感情はあまり表に出さない。' : '',
+  humor: v => v >= HIGH ? '軽い冗談を入れやすい。' : v <= LOW ? '冗談はほとんど言わない。' : '',
+  assertiveness: v => v >= HIGH ? '自分の意見ははっきり言う。' : v <= LOW ? '自分の意見は控えめに言う。' : ''
+});
+const BEHAVIOR_RULES = Object.freeze({
+  talkativeness: v => v <= LOW ? '一度に長く話さない。' : v >= HIGH ? '少し長く話してかまわない。' : '',
+  interruption: v => v >= HIGH ? '短い相づちをはさみやすい。' : v <= LOW ? '相づちは少なめでいい。' : '',
+  topicChange: v => v <= LOW ? '自分から話題を変えない。' : v >= HIGH ? '自分から話題を動かしてかまわない。' : '',
+  silenceTolerance: v => v >= HIGH ? '間が空いても、急いで埋めなくていい。' : ''
+});
+const SPEECH_RULES = Object.freeze({
+  politeness: v => v >= HIGH ? 'ていねいな言い方で。' : v <= LOW ? 'くだけた言い方で。' : '',
+  warmth: v => v >= HIGH ? '親しみを込めて。' : v <= LOW ? '距離を保った言い方で。' : '',
+  directness: v => v >= HIGH ? '回りくどく言わない。' : v <= LOW ? 'やわらかく、遠回しに。' : '',
+  sentenceLength: v => v <= LOW ? '一文は短く。' : v >= HIGH ? '一文は長めでもかまわない。' : '',
+  emotionalExpression: v => v >= HIGH ? '感情を言葉に出してよい。' : v <= LOW ? '感情は控えめに。' : '',
+  playfulness: v => v >= HIGH ? '遊び心を少し入れてよい。' : v <= LOW ? 'ふざけない。' : ''
+});
+/** How deep a companion may go on a topic before she is inventing expertise. */
+function depthLimit(expertise) {
+  if (expertise === null || expertise === undefined) return '';
+  if (expertise >= 80) return '専門的な説明まで踏み込んでよい';
+  if (expertise >= 60) return '少し詳しい説明まで';
+  if (expertise >= 40) return '一般常識の範囲で';
+  if (expertise >= 20) return '知っている範囲で短く';
+  return '質問や相づちが中心';
+}
+
+/**
+ * Render the numeric profile into behaviour, bounded.
+ *
+ * This is the function that decides whether Goal 19 stored a personality or a set of
+ * sliders. Everything it emits is derived from an allow-listed axis, so the only way
+ * a number reaches the model is through a sentence written here.
+ */
+function facetRules(character) {
+  const facets = character?.facets;
+  const parts = [];
+  const render = (table, values) => {
+    if (!values || typeof values !== 'object') return;
+    for (const key of Object.keys(table)) {
+      const value = values[key];
+      if (typeof value !== 'number') continue;
+      const line = table[key](value);
+      if (line) parts.push(line);
+    }
+  };
+  render(PERSONALITY_RULES, facets?.personality);
+  render(BEHAVIOR_RULES, facets?.behavior);
+  render(SPEECH_RULES, facets?.speechTendencies);
+  // Interests and expertise are the pair the Lab insists must stay separable:
+  // 「好きだが詳しくない」 and 「詳しいが自分からは話さない」 are both expressible only
+  // when the two numbers are read independently.
+  const topic = facets?.topic;
+  if (typeof facets?.interest === 'number') {
+    parts.push(facets.interest >= HIGH ? 'この話題には自分から乗っていってよい。'
+      : facets.interest <= LOW ? 'この話題には自分からは入らない。' : '');
+  }
+  if (typeof facets?.expertise === 'number') {
+    parts.push(`この話題で踏み込んでよい深さ: ${depthLimit(facets.expertise)}。それを超える説明はしない。`);
+  }
+  if (topic && topic !== 'general') parts.push(`いまの話題の種類: ${topic}。`);
+  // Values are stated whether or not a numeric facets block arrived: Goal 17 put
+  // them in the request and Goal 19 is the first thing that reads them, so they must
+  // not be gated behind a feature that has nothing to do with them.
+  const values = slugStrings(character.core?.values, 4).map(slug => VALUE_STATEMENTS[slug]).filter(Boolean);
+  if (values.length) parts.push(`大事にしていること: ${values.join('／')}。`);
+  const kept = parts.filter(Boolean);
+  if (!kept.length) return '';
+  return '【性格と知識】' + kept.join('')
+    + 'これらは強さの目安で、毎回すべてを守る必要はありません。説明しすぎないでください。';
+}
 
 /**
  * State the character and the remaining conversational work back to the model.
@@ -248,6 +408,10 @@ function characterRule(character, roomTurn) {
         + (['new', 'acquainted', 'familiar', 'close'].includes(stage) ? `なじみ具合=${stage}。` : '')
         + 'これらは傾向であって義務ではありません。毎回すべてを使わないでください。'
         + '自分が何を見ているか、自分がどんな役割かを説明しないでください。');
+      // Goal 19: the numeric profile and the values, which until now reached the
+      // request and influenced nothing.
+      const facets = facetRules(character);
+      if (facets) parts.push(facets);
     }
   }
   if (roomTurn && typeof roomTurn === 'object') {
